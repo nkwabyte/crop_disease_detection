@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 23
+names: ['Corn_Cercospora_Leaf_Spot', 'Corn_Common_Rust', 'Corn_Healthy', 'Corn_Northern_Leaf_Blight', 'Corn_Streak', 'Pepper_Bacterial_Spot', 'Pepper_Cercospora', 'Pepper_Early_Blight', 'Pepper_Fusarium', 'Pepper_Healthy', 'Pepper_Late_Blight', 'Pepper_Leaf_Blight', 'Pepper_Leaf_Curl', 'Pepper_Leaf_Mosaic', 'Pepper_Septoria', 'Tomato_Bacterial_Spot', 'Tomato_Early_Blight', 'Tomato_Fusarium', 'Tomato_Healthy', 'Tomato_Late_Blight', 'Tomato_Leaf_Curl', 'Tomato_Mosaic', 'Tomato_Septoria']
+
+roboflow:
+  workspace: ghanacropdiseasechallenge
+  project: ghana-crop-disease-challenge
+  version: 2
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/ghanacropdiseasechallenge/ghana-crop-disease-challenge/dataset/2

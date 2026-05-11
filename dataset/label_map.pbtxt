@@ -1,0 +1,92 @@
+item {
+  id: 1
+  name: 'Corn Cercospora Leaf Spot'
+}
+item {
+  id: 2
+  name: 'Corn Common Rust'
+}
+item {
+  id: 3
+  name: 'Corn Healthy'
+}
+item {
+  id: 4
+  name: 'Corn Streak'
+}
+item {
+  id: 5
+  name: 'Corn Northern Leaf Blight'
+}
+item {
+  id: 6
+  name: 'Pepper Leaf Curl'
+}
+item {
+  id: 7
+  name: 'Pepper Cercospora'
+}
+item {
+  id: 8
+  name: 'Pepper Leaf Blight'
+}
+item {
+  id: 9
+  name: 'Pepper Bacterial Spot'
+}
+item {
+  id: 10
+  name: 'Pepper Leaf Mosaic'
+}
+item {
+  id: 11
+  name: 'Pepper Healthy'
+}
+item {
+  id: 12
+  name: 'Pepper Fusarium'
+}
+item {
+  id: 13
+  name: 'Pepper Septoria'
+}
+item {
+  id: 14
+  name: 'Pepper Late Blight'
+}
+item {
+  id: 15
+  name: 'Pepper Early Blight'
+}
+item {
+  id: 16
+  name: 'Tomato Late Blight'
+}
+item {
+  id: 17
+  name: 'Tomato Early Blight'
+}
+item {
+  id: 18
+  name: 'Tomato Bacterial Spot'
+}
+item {
+  id: 19
+  name: 'Tomato Septoria'
+}
+item {
+  id: 20
+  name: 'Tomato Fusarium'
+}
+item {
+  id: 21
+  name: 'Tomato Leaf Curl'
+}
+item {
+  id: 22
+  name: 'Tomato Healthy'
+}
+item {
+  id: 23
+  name: 'Tomato Mosaic'
+}
