@@ -1,0 +1,26 @@
+model_name: crop_classifier_effnet_b2
+architecture: EfficientNet-B2
+task: image_classification
+exported_at: '2026-06-07T19:21:36.283400Z'
+input_size: 260
+input_channels: 3
+num_classes: 3
+class_names:
+- Corn
+- Pepper
+- Tomato
+conf_threshold: 0.55
+android_integration:
+  runtime: ExecuTorch
+  backend: XNNPACK
+  pte_file: crop_classifier.pte
+  input_normalize:
+    mean:
+    - 0.485
+    - 0.456
+    - 0.406
+    std:
+    - 0.229
+    - 0.224
+    - 0.225
+  input_format: NCHW_RGB
