@@ -1,0 +1,53 @@
+model_name: crop_disease_yolo26
+architecture: YOLO26
+task: object_detection
+exported_at: '2026-06-07T19:24:08.789359Z'
+input_size: 640
+input_channels: 3
+num_classes: 23
+class_names:
+- Corn_Cercospora_Leaf_Spot
+- Corn_Common_Rust
+- Corn_Healthy
+- Corn_Northern_Leaf_Blight
+- Corn_Streak
+- Pepper_Bacterial_Spot
+- Pepper_Cercospora
+- Pepper_Early_Blight
+- Pepper_Fusarium
+- Pepper_Healthy
+- Pepper_Late_Blight
+- Pepper_Leaf_Blight
+- Pepper_Leaf_Curl
+- Pepper_Leaf_Mosaic
+- Pepper_Septoria
+- Tomato_Bacterial_Spot
+- Tomato_Early_Blight
+- Tomato_Fusarium
+- Tomato_Healthy
+- Tomato_Late_Blight
+- Tomato_Leaf_Curl
+- Tomato_Mosaic
+- Tomato_Septoria
+conf_threshold: 0.5
+iou_threshold: 0.45
+crops_covered:
+- Corn
+- Pepper
+- Tomato
+notes: Trained on Ghana Crop Disease Challenge v2. Apply conf_threshold at inference
+  time before displaying results.
+android_integration:
+  runtime: ExecuTorch
+  backend: XNNPACK
+  pte_file: crop_disease_yolo26.pte
+  input_normalize:
+    mean:
+    - 0.0
+    - 0.0
+    - 0.0
+    std:
+    - 255.0
+    - 255.0
+    - 255.0
+  input_format: NCHW_RGB
