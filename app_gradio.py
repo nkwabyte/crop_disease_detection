@@ -173,54 +173,178 @@ def run_yolo(
     return sorted(detections, key=lambda d: -d["confidence"]), elapsed
 
 
+def get_font(font_size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    """Locate the best available TrueType font across OS platforms, fallback to default."""
+    font_paths = [
+        "/System/Library/Fonts/Helvetica.ttc",              # macOS
+        "/System/Library/Fonts/SFCompact.ttf",              # macOS alternative
+        "/System/Library/Fonts/Cache/Arial.ttf",            # macOS alternative
+        "/Library/Fonts/Arial.ttf",                         # macOS alternative
+        "C:\\Windows\\Fonts\\arial.ttf",                     # Windows
+        "C:\\Windows\\Fonts\\segoeui.ttf",                   # Windows
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",  # Linux (Ubuntu/Debian)
+        "/usr/share/fonts/truetype/freefont/FreeSans.ttf",  # Linux
+        "/usr/share/fonts/TTF/DejaVuSans.ttf",              # Linux (Arch)
+    ]
+    for path in font_paths:
+        try:
+            return ImageFont.truetype(path, font_size)
+        except Exception:
+            continue
+    return ImageFont.load_default()
+
+
 def draw_boxes(pil_img: Image.Image, detections: list[dict], thickness: int = 3) -> Image.Image:
+    w, h = pil_img.size
+    base_dim = min(w, h)
+    
+    # Scale thickness, font size, and corner accents relative to image resolution
+    scaled_thickness = max(2, int(base_dim / 250))
+    font_size = max(11, int(base_dim / 45))
+    corner_len = max(10, int(base_dim * 0.04))
+    corner_thickness = scaled_thickness + 2
+    
+    font = get_font(font_size)
     out  = pil_img.convert("RGB").copy()
     draw = ImageDraw.Draw(out, "RGBA")
-    try:
-        font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 14)
-    except Exception:
-        font = ImageFont.load_default()
 
     for det in detections:
         x1, y1, x2, y2 = det["bbox"]
         r, g, b = det["color"]
-        fill    = (r, g, b, 255)
-        draw.rectangle([x1, y1, x2, y2], outline=fill, width=thickness)
-        draw.rectangle([x1, y1, x2, y2], fill=(r, g, b, 22))
-        label   = f"  {det['icon']} {det['class_name'].replace('_', ' ')}  {det['confidence']:.2f}  "
+        
+        # 1. Subtle, clean semi-transparent box region fill
+        draw.rectangle([x1, y1, x2, y2], fill=(r, g, b, 15))
+        
+        # 2. Thin bounding box border (semi-transparent)
+        draw.rectangle([x1, y1, x2, y2], outline=(r, g, b, 180), width=scaled_thickness)
+        
+        # 3. Styled "Camera Focus / Target" Corner Brackets (L-shapes)
+        # Top-left corner
+        draw.line([(x1, y1), (x1 + corner_len, y1)], fill=(r, g, b, 255), width=corner_thickness)
+        draw.line([(x1, y1), (x1, y1 + corner_len)], fill=(r, g, b, 255), width=corner_thickness)
+        # Top-right corner
+        draw.line([(x2, y1), (x2 - corner_len, y1)], fill=(r, g, b, 255), width=corner_thickness)
+        draw.line([(x2, y1), (x2, y1 + corner_len)], fill=(r, g, b, 255), width=corner_thickness)
+        # Bottom-left corner
+        draw.line([(x1, y2), (x1 + corner_len, y2)], fill=(r, g, b, 255), width=corner_thickness)
+        draw.line([(x1, y2), (x1, y2 - corner_len)], fill=(r, g, b, 255), width=corner_thickness)
+        # Bottom-right corner
+        draw.line([(x2, y2), (x2 - corner_len, y2)], fill=(r, g, b, 255), width=corner_thickness)
+        draw.line([(x2, y2), (x2, y2 - corner_len)], fill=(r, g, b, 255), width=corner_thickness)
+
+        # 4. Premium rounded pill text badge
+        label = f" {det['icon']} {det['class_name'].replace('_', ' ')}  {det['confidence']:.2f} "
+        
+        # Measure label dimensions to size the pill perfectly
         text_bb = draw.textbbox((0, 0), label, font=font)
-        th      = text_bb[3] - text_bb[1]
-        ty1     = max(0, int(y1) - th - 6)
-        tx2     = int(x1) + (text_bb[2] - text_bb[0]) + 6
-        draw.rectangle([int(x1), ty1, tx2, int(y1)], fill=(r, g, b, 220))
-        draw.text((int(x1) + 3, ty1 + 1), label, fill=(255, 255, 255, 255), font=font)
+        text_w = text_bb[2] - text_bb[0]
+        text_h = text_bb[3] - text_bb[1]
+        
+        pad_x = max(6, int(font_size * 0.4))
+        pad_y = max(4, int(font_size * 0.25))
+        
+        pill_w = text_w + 2 * pad_x
+        pill_h = text_h + 2 * pad_y
+        
+        # Dynamic label placement (flip inside the box if it clips at the top edge of image)
+        if y1 - pill_h - 2 >= 0:
+            ty1 = int(y1) - pill_h - 2
+            ty2 = int(y1) - 2
+        else:
+            ty1 = int(y1) + 2
+            ty2 = int(y1) + pill_h + 2
+            
+        tx1 = int(x1)
+        tx2 = int(x1) + pill_w
+        
+        # Keep pill within horizontal limits
+        if tx2 > w:
+            tx1 = max(0, w - pill_w)
+            tx2 = w
+
+        # Draw rounded pill badge with semi-transparent white highlight border
+        radius = max(3, int(pill_h / 4))
+        draw.rounded_rectangle([tx1, ty1, tx2, ty2], radius=radius, fill=(r, g, b, 230), outline=(255, 255, 255, 100), width=1)
+        
+        # Render text vertically/horizontally centered
+        draw.text((tx1 + pad_x - text_bb[0], ty1 + pad_y - text_bb[1]), label, fill=(255, 255, 255, 255), font=font)
 
     return out
 
 
 def draw_rejected(pil_img: Image.Image, crop_conf: float) -> Image.Image:
-    """Return the image with a red rejection overlay."""
+    """Return the image with a beautiful glassmorphism-style warning card in the center."""
     out  = pil_img.convert("RGB").copy()
     draw = ImageDraw.Draw(out, "RGBA")
     w, h = out.size
-    draw.rectangle([0, 0, w, h], outline=(231, 76, 60, 255), width=6)
-    draw.rectangle([0, 0, w, h], fill=(231, 76, 60, 30))
-    try:
-        font_big  = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 32)
-        font_small = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 18)
-    except Exception:
-        font_big = font_small = ImageFont.load_default()
+    base_dim = min(w, h)
+    
+    # 1. Subtle overall red alert tint border
+    border_w = max(4, int(base_dim / 100))
+    draw.rectangle([0, 0, w, h], outline=(231, 76, 60, 200), width=border_w)
+    draw.rectangle([0, 0, w, h], fill=(231, 76, 60, 15))
+    
+    # 2. Dynamic font sizes
+    font_size_big = max(16, int(base_dim / 16))
+    font_size_small = max(11, int(base_dim / 26))
+    
+    font_big = get_font(font_size_big)
+    font_small = get_font(font_size_small)
 
     msg1 = "UNKNOWN CROP — REJECTED"
-    msg2 = f"Max classifier confidence: {crop_conf:.1%}  (below threshold)"
-    bb1  = draw.textbbox((0, 0), msg1, font=font_big)
-    bb2  = draw.textbbox((0, 0), msg2, font=font_small)
-    cx   = w // 2
-    cy   = h // 2
-    draw.text((cx - (bb1[2] - bb1[0]) // 2, cy - 36), msg1,
-              fill=(255, 255, 255, 230), font=font_big)
-    draw.text((cx - (bb2[2] - bb2[0]) // 2, cy + 10), msg2,
-              fill=(255, 200, 200, 200), font=font_small)
+    msg2 = f"Classifier Confidence: {crop_conf:.1%}"
+    msg3 = "Does not match Corn, Pepper, or Tomato"
+    
+    # Measure text blocks
+    bb1 = draw.textbbox((0, 0), msg1, font=font_big)
+    bb2 = draw.textbbox((0, 0), msg2, font=font_small)
+    bb3 = draw.textbbox((0, 0), msg3, font=font_small)
+    
+    w1, h1 = bb1[2] - bb1[0], bb1[3] - bb1[1]
+    w2, h2 = bb2[2] - bb2[0], bb2[3] - bb2[1]
+    w3, h3 = bb3[2] - bb3[0], bb3[3] - bb3[1]
+    
+    # Card padding
+    card_padding_x = max(20, int(base_dim * 0.06))
+    card_padding_y = max(16, int(base_dim * 0.05))
+    
+    max_text_w = max(w1, w2, w3)
+    card_w = max_text_w + 2 * card_padding_x
+    card_h = h1 + h2 + h3 + 2 * card_padding_y + max(12, int(base_dim * 0.03))
+    
+    # Clamp card size to fit inside image bounds
+    card_w = min(card_w, int(w * 0.9))
+    card_h = min(card_h, int(h * 0.9))
+    
+    # Center bounds
+    cx1 = (w - card_w) // 2
+    cy1 = (h - card_h) // 2
+    cx2 = cx1 + card_w
+    cy2 = cy1 + card_h
+    
+    # Draw central obsidian warning card
+    radius = max(6, int(card_h / 10))
+    draw.rounded_rectangle([cx1, cy1, cx2, cy2], radius=radius, fill=(15, 23, 42, 230), outline=(231, 76, 60, 255), width=2)
+    
+    # Text offsets inside the warning card
+    y_cursor = cy1 + card_padding_y
+    
+    # Msg 1
+    tx1 = cx1 + (card_w - w1) // 2
+    draw.text((tx1 - bb1[0], y_cursor - bb1[1]), msg1, fill=(231, 76, 60, 255), font=font_big)
+    
+    y_cursor += h1 + max(8, int(base_dim * 0.015))
+    
+    # Msg 2
+    tx2 = cx1 + (card_w - w2) // 2
+    draw.text((tx2 - bb2[0], y_cursor - bb2[1]), msg2, fill=(255, 255, 255, 240), font=font_small)
+    
+    y_cursor += h2 + max(6, int(base_dim * 0.01))
+    
+    # Msg 3
+    tx3 = cx1 + (card_w - w3) // 2
+    draw.text((tx3 - bb3[0], y_cursor - bb3[1]), msg3, fill=(143, 163, 177, 220), font=font_small)
+    
     return out
 
 
@@ -236,10 +360,14 @@ def make_summary_table(detections: list[dict]) -> list[list]:
     ]
 
 
-def make_conf_chart(detections: list[dict]) -> plt.Figure:
+def make_conf_chart(detections: list[dict], conf_threshold: float = 0.5) -> plt.Figure:
     fig, ax = plt.subplots(figsize=(8, max(2, len(detections) * 0.5)))
-    fig.patch.set_facecolor("#1a1a2e")
-    ax.set_facecolor("#16213e")
+    
+    # Use transparent background to integrate seamlessly with the theme CSS
+    fig.patch.set_facecolor("none")
+    fig.patch.set_alpha(0.0)
+    ax.set_facecolor("none")
+    ax.patch.set_alpha(0.0)
 
     if detections:
         names  = [d["class_name"].replace("_", " ") for d in detections]
@@ -247,8 +375,8 @@ def make_conf_chart(detections: list[dict]) -> plt.Figure:
         colors = [tuple(c / 255 for c in d["color"]) for d in detections]
         bars   = ax.barh(names, confs, color=colors, height=0.6, edgecolor="none")
         ax.set_xlim(0, 1)
-        ax.axvline(0.5, color="#e74c3c", linestyle="--", lw=1.5, alpha=0.8,
-                   label="Detection threshold (0.50)")
+        ax.axvline(conf_threshold, color="#e74c3c", linestyle="--", lw=1.5, alpha=0.8,
+                   label=f"Detection threshold ({conf_threshold:.2f})")
         for bar, conf in zip(bars, confs):
             ax.text(
                 min(conf + 0.02, 0.93),
@@ -256,7 +384,7 @@ def make_conf_chart(detections: list[dict]) -> plt.Figure:
                 f"{conf:.0%}", va="center", ha="left",
                 color="#eaeaea", fontsize=10, fontweight="bold",
             )
-        ax.legend(fontsize=9, facecolor="#1a1a2e", labelcolor="#aaaaaa", framealpha=0.7)
+        ax.legend(fontsize=9, facecolor="#0d1b2a", labelcolor="#aaaaaa", framealpha=0.8, edgecolor="#2c2c4e")
     else:
         ax.text(0.5, 0.5, "No detections", ha="center", va="center",
                 color="#7f8c8d", fontsize=14, transform=ax.transAxes)
@@ -348,7 +476,7 @@ def predict(
     if image is None:
         draw = ImageDraw.Draw(placeholder)
         draw.text((160, 185), "Upload a crop leaf image to begin  ☝️", fill=(100, 130, 160))
-        return placeholder, "", [], make_conf_chart([]), "⏳ Awaiting image…"
+        return placeholder, "", [], make_conf_chart([], conf_threshold), "⏳ Awaiting image…"
 
     # ── Stage 1: crop-type classifier ─────────────────────────────────────────
     clf = get_classifier(clf_path, clf_threshold)
@@ -369,7 +497,7 @@ def predict(
                 f"max confidence {crop_conf:.1%} < threshold {clf_threshold:.0%}.  "
                 "Not a recognised crop leaf."
             )
-            return annotated, stage1_html, [], make_conf_chart([]), status
+            return annotated, stage1_html, [], make_conf_chart([], conf_threshold), status
 
         stage1_html = _stage1_html(crop_label, crop_conf)
 
@@ -379,13 +507,13 @@ def predict(
         err_img = Image.new("RGB", (640, 200), (40, 10, 10))
         draw    = ImageDraw.Draw(err_img)
         draw.text((20, 85), f"YOLO model not found: {model_path}", fill=(231, 76, 60))
-        return err_img, stage1_html, [], make_conf_chart([]), f"❌ YOLO model not found: {model_path}"
+        return err_img, stage1_html, [], make_conf_chart([], conf_threshold), f"❌ YOLO model not found: {model_path}"
 
     detections, elapsed = run_yolo(image, conf_threshold, iou_threshold,
                                    model_path, allowed_ids)
     annotated = draw_boxes(image, detections)
     table     = make_summary_table(detections)
-    chart     = make_conf_chart(detections)
+    chart     = make_conf_chart(detections, conf_threshold)
 
     crop_tag = f"  [{CROP_ICONS.get(crop_label, '')} {crop_label}]" if crop_label else ""
 
