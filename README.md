@@ -5,7 +5,7 @@ Object detection system for diagnosing diseases in corn, pepper, and tomato crop
 
 The system uses a **two-stage pipeline**: a crop-type classifier first identifies the leaf species, then a disease detector runs on images confirmed to be from a known crop. This prevents cross-crop false positives (e.g., mango leaves being labelled as Tomato diseases).
 
-Five training scripts are provided:
+Six training scripts are provided:
 
 | Script | Purpose | Architecture | Output |
 | ------ | ------- | ------------ | ------ |
@@ -15,6 +15,7 @@ Five training scripts are provided:
 | `src/fasterrcnn/train_fasterrcnn.py` | Stage 2 — Faster RCNN baseline | ResNet-50-FPN-v2 | `outputs/fasterrcnn_output/` |
 | `src/fasterrcnn/train_alt_fasterrcnn.py` | Ablation study | 7 Faster RCNN variants | `outputs/alt_fasterrcnn_output/` |
 | `src/fasterrcnn/train_final.py` | Stage 2 — **SE-FPN final model** | ResNet-50-FPN-v2 + SE attention | `outputs/final_output/` |
+| `src/vit/train_vit.py` | Stage 2 — **ViTDet detector** | ViT-B/16 backbone + Faster RCNN head | `outputs/vit_output/` |
 
 ## Documentation
 
@@ -697,6 +698,107 @@ python train_final.py --export-only
 | `fig_10_pr_curves.png` | Precision–recall curves per class (with mAP area shaded) |
 | `fig_11_confusion_matrix.png` | Detection confusion matrix: rows = GT, cols = predicted + FN/FP |
 | `fig_13_cross_model_comparison.png` | SE-FPN final vs Faster RCNN v2 baseline: mAP, FPS, params |
+
+---
+
+## ViTDet — Vision Transformer Detector — `src/vit/train_vit.py`
+
+A transformer-backbone detector added for the research benchmark and as a
+farmer-selectable model option in the mobile app. The backbone is a torchvision
+**ViT-B/16** (ImageNet-pretrained) whose patch tokens are reshaped into a 2-D
+feature map and fed to the **same Faster RCNN detection head** (RPN + RoI) used by
+the ResNet pipelines. Holding the head constant isolates the backbone, giving a
+clean *"CNN backbone vs Transformer backbone"* comparison for the paper.
+
+The `src/vit/` package is **fully self-contained** — it copies the dataset,
+hard-negative download, evaluation, checkpointing, figures and export rather than
+importing them from `src/fasterrcnn/`, so the two packages stay decoupled.
+
+### Design notes
+
+- **Fixed square input.** ViT positional embeddings are resolution-specific, so
+  every image is resized to exactly 640×640 via `GeneralizedRCNNTransform(fixed_size=…)`.
+  The pretrained 14×14 (@224) pos-embeddings are bicubic-interpolated to the
+  40×40 (@640) token grid with torchvision's `interpolate_embeddings`.
+- **Single-scale feature map** (stride 16). A 1×1 projection maps the 768-dim
+  tokens → 256 channels to match the detection head's expected width.
+- **AdamW + low LR** (ViT fine-tuning), linear warmup → cosine decay, gradient
+  accumulation for a larger effective batch, backbone frozen for the first 5 epochs.
+
+### Quick start (ViTDet)
+
+```bash
+python -m src.vit.train_vit --dry-run     # 2-epoch timing estimate
+python -m src.vit.train_vit               # full pipeline (negatives → train → figures → export)
+python -m src.vit.train_vit --export-only # re-export best checkpoint to mobile formats
+```
+
+### All commands (ViTDet)
+
+| Command | When to use |
+| ------- | ----------- |
+| `python -m src.vit.train_vit` | Full pipeline from scratch |
+| `python -m src.vit.train_vit --dry-run` | 2-epoch timing estimate |
+| `python -m src.vit.train_vit --skip-negatives` | Negatives already downloaded |
+| `python -m src.vit.train_vit --figures-only` | Regenerate figures only |
+| `python -m src.vit.train_vit --export-only` | Re-export best checkpoint |
+| `python -m src.vit.train_vit --no-figures` | Train without figures |
+| `python -m src.vit.train_vit --epochs 20` | Override epoch count |
+| `python -m src.vit.train_vit --batch-size 4` | Override batch size (e.g. on the GPU server) |
+| `python -m src.vit.train_vit --no-pretrained` | Random-init ViT (ablation) |
+
+### Training configuration (ViTDet)
+
+| Parameter | Value | Notes |
+| --------- | ----- | ----- |
+| Backbone | ViT-B/16 (ImageNet-pretrained) | ~86M params; 12 encoder blocks |
+| Detection head | Faster RCNN (RPN + RoI) | Identical to the ResNet pipeline |
+| num_classes | 24 | 23 disease classes (1–23) + background (0) |
+| Image size | 640 × 640 (fixed square) | 40×40 = 1,600 patch tokens |
+| Batch size | 2 (effective 8) | Grad accumulation ×4; raise on CUDA |
+| Optimizer | AdamW (weight decay 1e-4) | ViT fine-tunes poorly under SGD 5e-3 |
+| Learning rate | 1e-4 → cosine decay | Linear warmup 3 epochs |
+| Backbone freeze | First 5 epochs | Head + projection train first |
+| Gradient clip | 5.0 | |
+| Hard negatives | 200 images | Empty annotations; shared `data/negatives/` |
+| Eval frequency | Every 3 epochs | VOC mAP@0.5 |
+| Workers | 0 (MPS) / 8 (CUDA) | |
+| Device | MPS / CUDA / CPU | Auto-detected |
+
+> **Hardware note.** ViT-B/16 at 640px (1,600 tokens) is memory-heavy. On the
+> M4 Pro (24 GB) keep `--batch-size 2`; on the CUDA GPU server raise it and the
+> DataLoader workers. Positional-embedding interpolation happens once at build time.
+
+### Mobile export (ViTDet)
+
+Exported to `outputs/vit_output/models/`, mirroring the Faster RCNN export pipeline:
+
+| File | Format | Use case |
+| ---- | ------ | -------- |
+| `crop_disease_vit.ptl` | TorchScript mobile | Android / iOS via LibTorch (**primary**) |
+| `crop_disease_vit.onnx` | ONNX | Any ONNX Runtime (universal fallback) |
+| `crop_disease_vit_backbone.pte` | ExecuTorch | ViT backbone feature extractor (exports cleanly — static shapes) |
+| `crop_disease_vit.pte` | ExecuTorch | Full model (if dynamic RPN/RoI export succeeds) |
+| `model_metadata.yaml` | YAML | Class names, thresholds, input spec |
+
+> The **ViT backbone is more ExecuTorch-friendly than ResNet-FPN** (pure static-shape
+> attention/MLP, no dynamic FPN ops), so `crop_disease_vit_backbone.pte` exports
+> reliably. The two-stage RPN+RoI head has the same dynamic-control-flow caveat as
+> the Faster RCNN full-model `.pte`; the `.ptl` is the primary on-device target.
+
+### Generated figures (ViTDet)
+
+| File | Contents |
+| ---- | -------- |
+| `fig_01_dataset_overview.png` | Images + annotations per split |
+| `fig_02_vit_architecture.png` | ViTDet pipeline: patchify → pos-embed → encoder → head |
+| `fig_03_lr_schedule.png` | AdamW warmup + cosine LR schedule |
+| `fig_08_training_metrics.png` | Loss components + validation mAP@0.5 (post-training) |
+| `fig_09_per_class_ap.png` | Per-class AP@0.5 bar chart (post-training) |
+
+The final test-set evaluation is also written to
+`outputs/vit_output/final_eval.json` and copied to `outputs/benchmarks/vitdet_vit_b16.json`
+for the cross-model comparison (see **Model Benchmarking** below).
 
 ---
 
