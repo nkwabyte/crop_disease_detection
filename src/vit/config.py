@@ -43,7 +43,8 @@ FPN_OUT_CHANNELS = 256   # 1×1 projection of the 768-dim tokens feeding the det
 # ResNet Faster R-CNN). These defaults reflect that.
 EPOCHS_DEFAULT         = 40
 PATIENCE_DEFAULT       = 10
-BATCH_SIZE             = 2     # ViT-B at 640px is memory-heavy; raise on CUDA via --batch-size
+BATCH_SIZE             = 2     # default on MPS/CPU (M4 Pro 24 GB) — ViT-B at 640px is heavy
+CUDA_BATCH_SIZE        = 8     # default when a CUDA GPU is detected (e.g. 96 GB RTX PRO 6000)
 ACCUM_STEPS            = 4     # effective batch = BATCH_SIZE × ACCUM_STEPS
 LR0                    = 1e-4  # AdamW peak LR
 WEIGHT_DECAY           = 1e-4
