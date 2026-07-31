@@ -270,8 +270,10 @@ def make_figures(comp: dict, out_dir: Path) -> None:
     if with_pc:
         mat = np.full((len(with_pc), len(CANONICAL_CLASSES)), np.nan)
         for i, d in enumerate(with_pc):
+            # tolerate underscored class names (YOLO / RT-DETR) vs spaced (Faster R-CNN)
+            pc = {k.replace("_", " "): v for k, v in d["per_class_ap"].items()}
             for j, cls in enumerate(CANONICAL_CLASSES):
-                v = d["per_class_ap"].get(cls)
+                v = pc.get(cls)
                 if isinstance(v, (int, float)):
                     mat[i, j] = v
         fig, ax = plt.subplots(figsize=(13, 1.1 + 0.6 * len(with_pc)))
