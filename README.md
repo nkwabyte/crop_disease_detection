@@ -5,7 +5,7 @@ Object detection system for diagnosing diseases in corn, pepper, and tomato crop
 
 The system uses a **two-stage pipeline**: a crop-type classifier first identifies the leaf species, then a disease detector runs on images confirmed to be from a known crop. This prevents cross-crop false positives (e.g., mango leaves being labelled as Tomato diseases).
 
-Six training scripts are provided:
+Eight training scripts are provided:
 
 | Script | Purpose | Architecture | Output |
 | ------ | ------- | ------------ | ------ |
@@ -16,6 +16,28 @@ Six training scripts are provided:
 | `src/fasterrcnn/train_alt_fasterrcnn.py` | Ablation study | 7 Faster RCNN variants | `outputs/alt_fasterrcnn_output/` |
 | `src/fasterrcnn/train_final.py` | Stage 2 — **SE-FPN final model** | ResNet-50-FPN-v2 + SE attention | `outputs/final_output/` |
 | `src/vit/train_vit.py` | Stage 2 — **ViTDet detector** | ViT-B/16 backbone + Faster RCNN head | `outputs/vit_output/` |
+| `src/swin/train_swin.py` | Stage 2 — **Swin detector** | Swin-V2-T + FPN + Faster RCNN head | `outputs/swin_output/` |
+| `src/rtdetr/train_rtdetr.py` | Stage 2 — **RT-DETR detector** | RT-DETR-L (transformer query head) | `outputs/rtdetr_output/` |
+
+## Environment
+
+Main training runs on the GPU server; local development is on an Apple Silicon Mac.
+
+- **Local (macOS, Python 3.11):** use [`requirements-py311.txt`](requirements-py311.txt) —
+  the tested env for the whole training/export/benchmark stack plus the Gradio app
+  (torch 2.11, torchvision 0.26, executorch 1.2, ultralytics 8.4, onnx/onnxruntime, gradio 6):
+
+  ```bash
+  python3.11 -m venv .venv
+  ./.venv/bin/pip install -r requirements-py311.txt
+  ```
+
+  > Python 3.14 is **not** usable here: `torch`/`torchvision` have 3.14 wheels but
+  > **`executorch` does not**, and executorch produces the `.pte` mobile artifacts.
+
+- **GPU server (Python 3.13):** the pinned [`requirements.txt`](requirements.txt) was
+  frozen on 3.13 (`audioop-lts`, `ipython 9.12`, … require ≥3.12/3.13) and is kept for
+  that interpreter.
 
 ## Documentation
 
@@ -802,6 +824,93 @@ for the cross-model comparison (see **Model Benchmarking** below).
 
 ---
 
+## Swin — Hierarchical Transformer Detector — `src/swin/train_swin.py`
+
+A hierarchical Vision Transformer detector complementing the single-scale ViTDet.
+The torchvision **Swin-V2-T** backbone produces a genuine multi-scale feature pyramid
+(/4, /8, /16, /32), wrapped in an **FPN** and fed to the same Faster RCNN head — a
+natural *"plain vs hierarchical transformer"* comparison, and usually stronger on
+small disease lesions thanks to the finer feature levels.
+
+Unlike ViT, Swin uses windowed attention with relative position bias, so it handles
+variable input sizes (no fixed-square resize needed). The `src/swin/` package is
+**fully self-contained** (dataset, eval, figures, export copied in, not imported).
+
+### Quick start (Swin)
+
+```bash
+python -m src.swin.train_swin --dry-run     # 2-epoch timing estimate
+python -m src.swin.train_swin               # full pipeline
+python -m src.swin.train_swin --export-only # re-export best checkpoint
+```
+
+Commands mirror the ViTDet script (`--skip-negatives`, `--figures-only`,
+`--no-figures`, `--epochs`, `--batch-size`, `--no-pretrained`).
+
+### Training configuration (Swin)
+
+| Parameter | Value | Notes |
+| --------- | ----- | ----- |
+| Backbone | Swin-V2-T (ImageNet-pretrained) | ~28M params; 4-stage hierarchy |
+| Detection head | FPN (out 256) + Faster RCNN | 5-level pyramid (default anchors) |
+| num_classes | 24 | 23 disease classes (1–23) + background (0) |
+| Image size | 640 (min/max) | Multi-scale features /4 … /32 |
+| Batch size | 2 (effective 8) | Grad accumulation ×4; raise on CUDA |
+| Optimizer | AdamW, LR 1e-4 → cosine | Warmup 3 epochs; backbone freeze 5 epochs |
+| Hard negatives | 200 | Shared `data/negatives/` |
+
+### Mobile export (Swin)
+
+Exported to `outputs/swin_output/models/`:
+
+| File | Format | Use case |
+| ---- | ------ | -------- |
+| `crop_disease_swin.onnx` | ONNX | Full-model deployable path (**primary**) |
+| `crop_disease_swin_backbone.pte` | ExecuTorch | Swin+FPN backbone (~121 MB — lighter than ViT) |
+| `model_metadata.yaml` | YAML | Class names, thresholds, input spec |
+
+> The Swin backbone `.pte` exports cleanly. The full two-stage model keeps the same
+> dynamic RPN/RoI `.pte` caveat as Faster RCNN, and TorchScript is unavailable for
+> Swin's dynamic backbone loop — so **ONNX is the full-model deliverable** here.
+
+---
+
+## RT-DETR — Transformer Query Detector — `src/rtdetr/train_rtdetr.py`
+
+A **query-based transformer detector** (Ultralytics **RT-DETR-L**): no anchors, no NMS.
+Whereas the ViT and Swin detectors swap the *backbone* under a region-based head,
+RT-DETR replaces the *detection paradigm* itself — completing the paper's comparison
+matrix (CNN/Transformer **backbone** × region/query **head**).
+
+Because RT-DETR inference is static-shape (fixed object queries, no NMS), it is the
+most **ExecuTorch-friendly full model** of the transformer detectors — it can export
+as a single end-to-end `.pte` the app consumes directly, exactly like YOLO26. It trains
+on the same YOLO-format `data/main/` dataset with the same 0-indexed class order.
+
+### Quick start (RT-DETR)
+
+```bash
+python -m src.rtdetr.train_rtdetr --dry-run    # 1-epoch timing estimate
+python -m src.rtdetr.train_rtdetr              # full pipeline
+python -m src.rtdetr.export_rtdetr             # export ONNX + ExecuTorch .pte
+```
+
+Ultralytics auto-saves training curves, PR curves and the confusion matrix under
+`outputs/rtdetr_output/`; the script adds `final_eval.json` +
+`outputs/benchmarks/rtdetr_l.json` for the cross-model comparison.
+
+### Mobile export (RT-DETR)
+
+Exported to `models/` by `export_rtdetr.py`:
+
+| File | Format | Use case |
+| ---- | ------ | -------- |
+| `crop_disease_rtdetr.pte` | ExecuTorch | **Full end-to-end model** (NMS-free → exports whole) |
+| `crop_disease_rtdetr.onnx` | ONNX | Universal fallback |
+| `rtdetr_metadata.yaml` | YAML | Class names, thresholds, input spec |
+
+---
+
 ## Publication Figures
 
 ### YOLO26 — `outputs/yolo_output/`
@@ -876,6 +985,8 @@ compared head-to-head for the paper:
 | Ablation (7 configs) | `results.json` + figures | `results.json` |
 | SE-FPN final | `metrics_history.json` + 15 figures | `final_eval.json` (mAP + per-class AP) |
 | ViTDet | `metrics_history.json` + figures | `final_eval.json` (mAP + per-class AP) |
+| Swin | `metrics_history.json` + figures | `final_eval.json` (mAP + per-class AP) |
+| RT-DETR | Ultralytics curves + PR/confusion figures | `final_eval.json` (mAP@0.5) |
 
 Each detector also drops a copy of its final summary into `outputs/benchmarks/<model>.json`.
 The aggregator reads whatever exists and builds a unified comparison — it never re-runs a
