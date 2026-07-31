@@ -21,7 +21,7 @@ no NMS). The gaps below are ordered by impact-to-effort.
 
 ## Tier 1 — highest impact for the paper
 
-### 1. RT-DETR / DETR-style query head (transformer *detection paradigm*) — ✅ DONE (`src/rtdetr/`)
+### 1. RT-DETR / DETR-style query head (transformer *detection paradigm*) — [OK] DONE (`src/rtdetr/`)
 The ViTDet added here swaps the *backbone* but keeps the region-based (RPN + RoI) head.
 A **query-based detector** (DETR / RT-DETR) removes anchors and NMS entirely — a
 genuinely different detection paradigm. This gives the paper the full 2×2 story:
@@ -35,7 +35,7 @@ CNN-vs-Transformer **backbone** × region-vs-query **head**.
 - **Effort:** medium. RT-DETR is available via Ultralytics (`RTDETR`), so it can reuse the
   YOLO-style ExecuTorch export path already in `src/yolo/export_yolo.py`.
 
-### 2. Swin Transformer backbone (hierarchical transformer + FPN) — ✅ DONE (`src/swin/`)
+### 2. Swin Transformer backbone (hierarchical transformer + FPN) — [OK] DONE (`src/swin/`)
 ViT-B is single-scale; **Swin** is hierarchical and produces a true multi-scale feature
 pyramid, which usually beats plain ViT on detection (especially small lesions).
 
@@ -58,12 +58,19 @@ honest on-device story and a realistic app model.
 
 ## Tier 2 — rigor and completeness
 
-### 4. INT8 / dynamic quantization for ExecuTorch
-The ViT-B `.pte` backbone is ~348 MB fp32. **XNNPACK quantization** (already the backend
-in the export scripts) can cut this ~4× and speed up CPU inference.
+### 4. INT8 / dynamic quantization for ExecuTorch — [WAIT] PARTLY DONE (`src/benchmark/quantize.py`, `latency.py`)
+The ViT-B `.pte` backbone is ~348 MB fp32. **XNNPACK PT2E quantization** cuts this ~4×.
 
-- **Why it stands out:** turns "it exports" into "it runs on a mid-range phone."
-- **Effort:** low. Add a quantized `.pte` variant using ExecuTorch's XNNPACK quantizer.
+- **Built:** `src/benchmark/quantize.py` (PT2E static INT8 → XNNPACK `.pte`, with an
+  automatic fp32-vs-int8 fidelity check) and `src/benchmark/latency.py` (size + CPU
+  latency of every exported artifact).
+- **Findings:** PTQ preserves accuracy on CNN backbones (ResNet: 100% top-1 agreement,
+  ~3.8× smaller) but **collapses EfficientNet-B2** — the Stage-1 classifier needs **QAT**.
+  Size shrinks ~4× everywhere; on Apple Silicon latency is roughly flat (INT8 CPU speedup
+  shows on mid-range Android).
+- **Remaining:** run `quantize.py` on the GPU server where the detector checkpoints live
+  (ViT/Swin backbones), and add a **QAT** recipe for the EfficientNet classifier (or swap
+  it for a quantization-friendly Stage-1 backbone).
 
 ### 5. Anchor-free head (FCOS / RetinaNet) on the ViT/Swin backbone
 Adds a **one-stage** transformer-backbone point to complement the two-stage ViTDet — and
@@ -107,9 +114,10 @@ and some Swin/MobileViT variants would pull in `timm`; keep that opt-in and isol
 its own `src/<model>/` package, consistent with how `src/vit/` is decoupled.
 
 ## Recommended order
-1. ~~**RT-DETR**~~ — ✅ done (`src/rtdetr/`)
-2. ~~**Swin backbone**~~ — ✅ done (`src/swin/`)
-3. **Quantized `.pte` + on-device latency table** (deployment credibility) ← next
-4. **Multi-seed + mAP@[.5:.95] + significance** (reviewer-proofing)
+1. ~~**RT-DETR**~~ — [OK] done (`src/rtdetr/`)
+2. ~~**Swin backbone**~~ — [OK] done (`src/swin/`)
+3. ~~**Quantization + latency tooling**~~ — [WAIT] tools done (`src/benchmark/quantize.py`,
+   `latency.py`); run on the server + add a QAT recipe for the EfficientNet classifier
+4. **Multi-seed + mAP@[.5:.95] + significance** (reviewer-proofing) ← next
 5. **Attention/Grad-CAM explainability figure** (adoption story)
 6. **Mobile-first transformer backbone** (MobileViT / EfficientViT) for a shippable model
