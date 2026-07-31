@@ -10,14 +10,18 @@ make the research publication stand out, given the project's two constraints:
 
 The current benchmark covers: **YOLO26n** (CNN one-stage), **Faster RCNN v2** (CNN
 two-stage), **SE-FPN** (CNN two-stage + attention), a **7-config Faster RCNN ablation**,
-and **ViTDet** (ViT-B/16 transformer backbone + Faster RCNN head). The gaps below are
-ordered by impact-to-effort.
+**ViTDet** (ViT-B/16 transformer backbone + Faster RCNN head), **Swin** (hierarchical
+transformer backbone + FPN + Faster RCNN head), and **RT-DETR** (transformer query head,
+no NMS). The gaps below are ordered by impact-to-effort.
+
+> **Status:** Tier-1 items 1 (RT-DETR, `src/rtdetr/`) and 2 (Swin, `src/swin/`) are now
+> implemented. The remaining recommendations below are the next highest-value additions.
 
 ---
 
 ## Tier 1 — highest impact for the paper
 
-### 1. RT-DETR / DETR-style query head (transformer *detection paradigm*)
+### 1. RT-DETR / DETR-style query head (transformer *detection paradigm*) — ✅ DONE (`src/rtdetr/`)
 The ViTDet added here swaps the *backbone* but keeps the region-based (RPN + RoI) head.
 A **query-based detector** (DETR / RT-DETR) removes anchors and NMS entirely — a
 genuinely different detection paradigm. This gives the paper the full 2×2 story:
@@ -31,7 +35,7 @@ CNN-vs-Transformer **backbone** × region-vs-query **head**.
 - **Effort:** medium. RT-DETR is available via Ultralytics (`RTDETR`), so it can reuse the
   YOLO-style ExecuTorch export path already in `src/yolo/export_yolo.py`.
 
-### 2. Swin Transformer backbone (hierarchical transformer + FPN)
+### 2. Swin Transformer backbone (hierarchical transformer + FPN) — ✅ DONE (`src/swin/`)
 ViT-B is single-scale; **Swin** is hierarchical and produces a true multi-scale feature
 pyramid, which usually beats plain ViT on detection (especially small lesions).
 
@@ -103,8 +107,9 @@ and some Swin/MobileViT variants would pull in `timm`; keep that opt-in and isol
 its own `src/<model>/` package, consistent with how `src/vit/` is decoupled.
 
 ## Recommended order
-1. **RT-DETR** (biggest paper payoff + best mobile `.pte` story, low effort via Ultralytics)
-2. **Swin backbone** (hierarchical-transformer comparison, no new deps)
-3. **Quantized `.pte` + on-device latency table** (deployment credibility)
+1. ~~**RT-DETR**~~ — ✅ done (`src/rtdetr/`)
+2. ~~**Swin backbone**~~ — ✅ done (`src/swin/`)
+3. **Quantized `.pte` + on-device latency table** (deployment credibility) ← next
 4. **Multi-seed + mAP@[.5:.95] + significance** (reviewer-proofing)
 5. **Attention/Grad-CAM explainability figure** (adoption story)
+6. **Mobile-first transformer backbone** (MobileViT / EfficientViT) for a shippable model
