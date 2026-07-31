@@ -68,7 +68,7 @@ PALETTE = [
     (142, 68,  173), (243, 156, 18),  (22,  160, 133),
 ]
 
-CROP_ICONS = {"Corn": "", "Pepper": "", "Tomato": ""}
+CROP_ICONS = {"Corn": "🌽", "Pepper": "🫑", "Tomato": "🍅"}
 CROP_COLORS = {"Corn": "#f0a500", "Pepper": "#27ae60", "Tomato": "#e74c3c"}
 
 
@@ -165,7 +165,7 @@ def run_yolo(
                 "class_id"  : cls_id,
                 "class_name": CLASS_NAMES[cls_id],
                 "crop"      : crop,
-                "icon"      : CROP_ICONS.get(crop, ""),
+                "icon"      : CROP_ICONS.get(crop, "🌿"),
                 "confidence": cf,
                 "bbox"      : (x1, y1, x2, y2),
                 "color"     : PALETTE[cls_id],
@@ -400,7 +400,7 @@ def make_conf_chart(detections: list[dict], conf_threshold: float = 0.5) -> plt.
 def _stage1_html(crop: str, crop_conf: float) -> str:
     """Render the Stage 1 result banner."""
     color = CROP_COLORS.get(crop, "#e74c3c")
-    icon  = CROP_ICONS.get(crop, "")
+    icon  = CROP_ICONS.get(crop, "❓")
     return f"""
     <div style="
         display:flex; align-items:center; gap:12px;
@@ -619,7 +619,7 @@ with gr.Blocks(title="Crop Disease Detector", theme=_THEME, css=CUSTOM_CSS) as d
             Stage 1: EfficientNet-B2 crop classifier &nbsp;·&nbsp;
             Stage 2: YOLO26 disease detector &nbsp;·&nbsp;
             23 disease classes &nbsp;·&nbsp;
-            Corn &nbsp;·&nbsp; Pepper &nbsp;·&nbsp; Tomato
+            🌽 Corn &nbsp;·&nbsp; 🫑 Pepper &nbsp;·&nbsp; 🍅 Tomato
         </p>
     </div>
     """)
@@ -744,7 +744,7 @@ with gr.Blocks(title="Crop Disease Detector", theme=_THEME, css=CUSTOM_CSS) as d
         false positives (e.g., the detector predicting a Tomato disease on a Corn leaf).
 
         ## Supported disease classes (23)
-        | Corn (5) | Pepper (10) | Tomato (8) |
+        | 🌽 Corn (5) | 🫑 Pepper (10) | 🍅 Tomato (8) |
         |-------------|----------------|---------------|
         | Cercospora Leaf Spot | Bacterial Spot | Bacterial Spot |
         | Common Rust | Cercospora | Early Blight |
