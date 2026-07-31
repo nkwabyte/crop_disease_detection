@@ -525,7 +525,7 @@ def train(args: argparse.Namespace) -> None:
             torch.save({"epoch": epoch, "model": cpu_state,
                         "valid_acc": valid_acc},
                        OUTPUT_DIR / "best.pth")
-            print(f"        ✓ new best valid acc: {best_valid_acc*100:.2f}%")
+            print(f"        [OK] new best valid acc: {best_valid_acc*100:.2f}%")
         else:
             epochs_no_improve += 1
             if epochs_no_improve >= PATIENCE:

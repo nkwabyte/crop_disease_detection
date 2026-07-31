@@ -270,7 +270,7 @@ def _build_vit(img_size: int, pretrained: bool = True) -> VisionTransformer:
     try:
         src = vit_b_16(weights=weights)
     except Exception as exc:
-        print(f"  ⚠  Could not load pretrained ViT weights ({exc}); using random init.")
+        print(f"  [WARN]  Could not load pretrained ViT weights ({exc}); using random init.")
         src = vit_b_16(weights=None)
 
     if img_size == src.image_size:
@@ -602,7 +602,7 @@ def save_final_eval(result: dict, model: nn.Module, split: str = "test") -> None
         with open(BENCHMARK_DIR / "vitdet_vit_b16.json", "w") as f:
             json.dump(payload, f, indent=2)
     except Exception as exc:
-        print(f"  ⚠  Could not write shared benchmark summary: {exc}")
+        print(f"  [WARN]  Could not write shared benchmark summary: {exc}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -652,7 +652,7 @@ def generate_figures(pre_only: bool = False) -> None:
         fig.savefig(OUTPUT_DIR / "fig_01_dataset_overview.png", bbox_inches="tight")
         plt.close(fig)
     except Exception as exc:
-        print(f"  ⚠  fig_01 skipped: {exc}")
+        print(f"  [WARN]  fig_01 skipped: {exc}")
 
     # ── fig_02 — ViTDet architecture schematic ───────────────────────────────
     try:
@@ -683,7 +683,7 @@ def generate_figures(pre_only: bool = False) -> None:
         fig.savefig(OUTPUT_DIR / "fig_02_vit_architecture.png", bbox_inches="tight")
         plt.close(fig)
     except Exception as exc:
-        print(f"  ⚠  fig_02 skipped: {exc}")
+        print(f"  [WARN]  fig_02 skipped: {exc}")
 
     # ── fig_03 — LR schedule ─────────────────────────────────────────────────
     try:
@@ -706,7 +706,7 @@ def generate_figures(pre_only: bool = False) -> None:
         fig.savefig(OUTPUT_DIR / "fig_03_lr_schedule.png", bbox_inches="tight")
         plt.close(fig)
     except Exception as exc:
-        print(f"  ⚠  fig_03 skipped: {exc}")
+        print(f"  [WARN]  fig_03 skipped: {exc}")
 
     if pre_only:
         print("  Pre-training figures written (no checkpoint required).")
@@ -735,7 +735,7 @@ def generate_figures(pre_only: bool = False) -> None:
             fig.savefig(OUTPUT_DIR / "fig_08_training_metrics.png", bbox_inches="tight")
             plt.close(fig)
         except Exception as exc:
-            print(f"  ⚠  fig_08 skipped: {exc}")
+            print(f"  [WARN]  fig_08 skipped: {exc}")
 
     # ── fig_09 — per-class AP (needs final_eval.json) ────────────────────────
     if FINAL_EVAL_FILE.exists():
@@ -759,7 +759,7 @@ def generate_figures(pre_only: bool = False) -> None:
             fig.savefig(OUTPUT_DIR / "fig_09_per_class_ap.png", bbox_inches="tight")
             plt.close(fig)
         except Exception as exc:
-            print(f"  ⚠  fig_09 skipped: {exc}")
+            print(f"  [WARN]  fig_09 skipped: {exc}")
 
     print(f"  Figures written → {OUTPUT_DIR}")
 
@@ -797,19 +797,19 @@ def export_model(model: nn.Module) -> None:
         optimized = optimize_for_mobile(scripted)
         ptl_path  = MODELS_DIR / "crop_disease_vit.ptl"
         optimized._save_for_lite_interpreter(str(ptl_path))
-        print(f"         ✅ {ptl_path.name}  ({ptl_path.stat().st_size / 1e6:.1f} MB)")
+        print(f"         [OK] {ptl_path.name}  ({ptl_path.stat().st_size / 1e6:.1f} MB)")
     except Exception as exc:
-        print(f"         ⚠  TorchScript mobile failed: {exc}")
+        print(f"         [WARN]  TorchScript mobile failed: {exc}")
         # Remove any partial lite-interpreter file, then save a plain TorchScript archive.
         (MODELS_DIR / "crop_disease_vit.ptl").unlink(missing_ok=True)
         try:
             scripted = torch.jit.script(model)
             pt_path  = MODELS_DIR / "crop_disease_vit_jit.pt"
             scripted.save(str(pt_path))
-            print(f"         ✅ Saved plain TorchScript: {pt_path.name}  "
+            print(f"         [OK] Saved plain TorchScript: {pt_path.name}  "
                   f"({pt_path.stat().st_size / 1e6:.1f} MB)")
         except Exception as exc2:
-            print(f"         ✗  TorchScript also failed: {exc2}")
+            print(f"         [FAIL]  TorchScript also failed: {exc2}")
 
     # ── 2. ONNX (universal fallback) ─────────────────────────────────────────
     # Wrap so the graph returns plain (boxes, scores, labels) tensors rather than a
@@ -833,9 +833,9 @@ def export_model(model: nn.Module) -> None:
             dynamic_axes={"images": {0: "batch"}, "boxes": {0: "n_det"},
                           "scores": {0: "n_det"}, "labels": {0: "n_det"}},
         )
-        print(f"         ✅ {onnx_path.name}  ({onnx_path.stat().st_size / 1e6:.1f} MB)")
+        print(f"         [OK] {onnx_path.name}  ({onnx_path.stat().st_size / 1e6:.1f} MB)")
     except Exception as exc:
-        print(f"         ⚠  ONNX export failed: {exc}")
+        print(f"         [WARN]  ONNX export failed: {exc}")
 
     # ── 3. ExecuTorch (.pte) — backbone (clean) + full model (attempt) ───────
     print("  [3/4]  ExecuTorch (.pte) …")
@@ -856,7 +856,7 @@ def export_model(model: nn.Module) -> None:
         pte_bb = MODELS_DIR / "crop_disease_vit_backbone.pte"
         with open(pte_bb, "wb") as f:
             f.write(et.buffer)
-        print(f"         ✅ {pte_bb.name}  ({pte_bb.stat().st_size / 1e6:.1f} MB)  [backbone]")
+        print(f"         [OK] {pte_bb.name}  ({pte_bb.stat().st_size / 1e6:.1f} MB)  [backbone]")
 
         # 3b. Full detection model — dynamic RPN/RoI control flow; best-effort.
         try:
@@ -870,12 +870,12 @@ def export_model(model: nn.Module) -> None:
             pte_full = MODELS_DIR / "crop_disease_vit.pte"
             with open(pte_full, "wb") as f:
                 f.write(et_full.buffer)
-            print(f"         ✅ {pte_full.name}  ({pte_full.stat().st_size / 1e6:.1f} MB)  [full]")
+            print(f"         [OK] {pte_full.name}  ({pte_full.stat().st_size / 1e6:.1f} MB)  [full]")
         except Exception as exc:
-            print(f"         ℹ  Full-model .pte not exported ({type(exc).__name__}); "
+            print(f"         [INFO]  Full-model .pte not exported ({type(exc).__name__}); "
                   f"use the backbone .pte + .ptl for on-device detection.")
     except Exception as exc:
-        print(f"         ⚠  ExecuTorch export failed: {exc}")
+        print(f"         [WARN]  ExecuTorch export failed: {exc}")
 
     # ── 4. Metadata YAML ─────────────────────────────────────────────────────
     print("  [4/4]  Metadata …")
@@ -909,7 +909,7 @@ def export_model(model: nn.Module) -> None:
     meta_path = MODELS_DIR / "model_metadata.yaml"
     with open(meta_path, "w") as f:
         yaml.dump(metadata, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
-    print(f"         ✅ {meta_path.name}")
+    print(f"         [OK] {meta_path.name}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -957,7 +957,7 @@ def main() -> None:
     if args.export_only:
         best = CKPT_DIR / "best.pth"
         if not best.exists():
-            print(f"❌ No checkpoint at {best}. Train first."); return
+            print(f"[ERROR] No checkpoint at {best}. Train first."); return
         model = build_model(pretrained=False)
         ckpt = torch.load(best, map_location="cpu", weights_only=False)
         model.load_state_dict(ckpt["model_state_dict"])
@@ -1022,7 +1022,7 @@ def main() -> None:
         if is_best:
             best_map = val_map
             epochs_no_improve = 0
-            print(f"  ✨  New best mAP@0.5: {best_map:.4f}")
+            print(f"  [*]  New best mAP@0.5: {best_map:.4f}")
         elif val_map is not None:
             epochs_no_improve += 1
 
@@ -1060,7 +1060,7 @@ def main() -> None:
     # ── Step 4 — export ──────────────────────────────────────────────────────
     print("\nStep 4 — export")
     export_model(model)
-    print("\n✅  ViTDet pipeline complete.")
+    print("\n[OK]  ViTDet pipeline complete.")
 
 
 if __name__ == "__main__":

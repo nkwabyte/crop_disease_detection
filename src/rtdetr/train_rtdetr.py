@@ -158,7 +158,7 @@ def write_benchmark_summary(model, metrics) -> None:
             for i, ap in enumerate(list(ap50)):
                 per_class[names.get(i, str(i))] = round(float(ap), 5)
     except Exception as exc:
-        print(f"  ⚠  could not read RT-DETR metrics: {exc}")
+        print(f"  [WARN]  could not read RT-DETR metrics: {exc}")
 
     payload = {
         "model_name": "rtdetr_l",
@@ -177,7 +177,7 @@ def write_benchmark_summary(model, metrics) -> None:
         with open(BENCHMARK_DIR / "rtdetr_l.json", "w") as f:
             json.dump(payload, f, indent=2)
     except Exception as exc:
-        print(f"  ⚠  could not write shared benchmark summary: {exc}")
+        print(f"  [WARN]  could not write shared benchmark summary: {exc}")
     print(f"  Final eval saved → {RUNS_DIR / 'final_eval.json'}  (mAP@0.5={payload['map50']})")
 
 
@@ -232,7 +232,7 @@ def main() -> None:
     print("\n  Validating best checkpoint …")
     metrics = model.val(data=str(RTDETR_YAML), imgsz=IMG_SIZE, device=device)
     write_benchmark_summary(model, metrics)
-    print("\n✅  RT-DETR pipeline complete. Export with:  python -m src.rtdetr.export_rtdetr")
+    print("\n[OK]  RT-DETR pipeline complete. Export with:  python -m src.rtdetr.export_rtdetr")
 
 
 if __name__ == "__main__":

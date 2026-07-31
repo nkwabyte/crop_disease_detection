@@ -76,7 +76,7 @@ def _collect_benchmark_jsons() -> list[dict]:
                     "source": p.name,
                 })
         except Exception as exc:
-            print(f"  ⚠  could not read {p.name}: {exc}")
+            print(f"  [WARN]  could not read {p.name}: {exc}")
     return records
 
 
@@ -230,7 +230,7 @@ def make_figures(comp: dict, out_dir: Path) -> None:
         import matplotlib.pyplot as plt
         import numpy as np
     except Exception as exc:
-        print(f"  ⚠  matplotlib unavailable, skipping figures: {exc}")
+        print(f"  [WARN]  matplotlib unavailable, skipping figures: {exc}")
         return
 
     dets = [d for d in comp["detectors"] if d.get("map50") is not None]

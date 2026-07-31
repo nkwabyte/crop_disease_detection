@@ -29,7 +29,7 @@ def _best_checkpoint() -> Path:
         return best
     candidates = sorted(RUNS_DIR.glob("*/weights/best.pt"), key=lambda p: p.stat().st_mtime)
     if candidates:
-        print(f"⚠️ Using fallback checkpoint: {candidates[-1]}")
+        print(f"[WARN] Using fallback checkpoint: {candidates[-1]}")
         return candidates[-1]
     raise FileNotFoundError("No trained RT-DETR checkpoint found. Train the model first.")
 
@@ -50,9 +50,9 @@ def main() -> None:
                                 simplify=True, opset=17, half=False)
         dst_onnx = MODELS_DIR / "crop_disease_rtdetr.onnx"
         shutil.copy2(str(onnx_res), dst_onnx)
-        print(f"✅ ONNX → {dst_onnx} ({dst_onnx.stat().st_size / 1_048_576:.1f} MB)")
+        print(f"[OK] ONNX → {dst_onnx} ({dst_onnx.stat().st_size / 1_048_576:.1f} MB)")
     except Exception as exc:
-        print(f"⚠️ ONNX export failed: {exc}")
+        print(f"[WARN] ONNX export failed: {exc}")
 
     # ── ExecuTorch (.pte) — full model (RT-DETR is NMS-free / static-shape) ────
     print("\nExporting to ExecuTorch (.pte) …")
@@ -68,11 +68,11 @@ def main() -> None:
             pte_src = et_path
         if pte_src and pte_src.exists():
             shutil.copy2(pte_src, dst_pte)
-            print(f"✅ ExecuTorch → {dst_pte} ({dst_pte.stat().st_size / 1_048_576:.1f} MB)")
+            print(f"[OK] ExecuTorch → {dst_pte} ({dst_pte.stat().st_size / 1_048_576:.1f} MB)")
         else:
-            print(f"⚠️ Could not locate .pte in {et_path}")
+            print(f"[WARN] Could not locate .pte in {et_path}")
     except Exception as exc:
-        print(f"⚠️ ExecuTorch export failed ({exc}); ONNX remains the full-model fallback.")
+        print(f"[WARN] ExecuTorch export failed ({exc}); ONNX remains the full-model fallback.")
 
     # ── Metadata ──────────────────────────────────────────────────────────────
     metadata = {
