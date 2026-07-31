@@ -933,9 +933,9 @@ def export_model(model: nn.Module) -> None:
         opt      = optimize_for_mobile(scripted)
         ptl_path = MODELS_DIR / f"{prefix}.ptl"
         opt._save_for_lite_interpreter(str(ptl_path))
-        print(f"  ✓  TorchScript mobile → {ptl_path.name}")
+        print(f"  [OK]  TorchScript mobile → {ptl_path.name}")
     except Exception as exc:
-        print(f"  ✗  TorchScript mobile failed: {exc}")
+        print(f"  [FAIL]  TorchScript mobile failed: {exc}")
 
     # 2. ONNX
     try:
@@ -952,9 +952,9 @@ def export_model(model: nn.Module) -> None:
             dynamic_axes={"image": {0: "batch"}},
         )
         onnx.checker.check_model(str(onnx_path))
-        print(f"  ✓  ONNX → {onnx_path.name}")
+        print(f"  [OK]  ONNX → {onnx_path.name}")
     except Exception as exc:
-        print(f"  ✗  ONNX export failed: {exc}")
+        print(f"  [FAIL]  ONNX export failed: {exc}")
 
     # 3. ExecuTorch backbone
     try:
@@ -972,9 +972,9 @@ def export_model(model: nn.Module) -> None:
         pte_path = MODELS_DIR / f"{prefix}_backbone.pte"
         with open(pte_path, "wb") as f:
             f.write(et_prog.buffer)
-        print(f"  ✓  ExecuTorch backbone → {pte_path.name}")
+        print(f"  [OK]  ExecuTorch backbone → {pte_path.name}")
     except Exception as exc:
-        print(f"  ✗  ExecuTorch export failed: {exc}")
+        print(f"  [FAIL]  ExecuTorch export failed: {exc}")
 
     # 4. Metadata YAML
     meta = {
@@ -989,7 +989,7 @@ def export_model(model: nn.Module) -> None:
     yaml_path = MODELS_DIR / "model_metadata.yaml"
     with open(yaml_path, "w") as f:
         yaml.dump(meta, f, default_flow_style=False, allow_unicode=True)
-    print(f"  ✓  Metadata YAML → {yaml_path.name}")
+    print(f"  [OK]  Metadata YAML → {yaml_path.name}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1158,7 +1158,7 @@ def generate_figures(per_class_ap: Optional[dict] = None,
     plt.tight_layout()
     out = OUTPUT_DIR / "fig_01_dataset_overview.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_01  dataset overview")
+    print("  [OK]  fig_01  dataset overview")
 
     # ── Fig 02: Anchor analysis — k-means vs default ───────────────────────────
     default_anchors = [32, 64, 128, 256, 512]
@@ -1199,7 +1199,7 @@ def generate_figures(per_class_ap: Optional[dict] = None,
     plt.tight_layout()
     out = OUTPUT_DIR / "fig_02_anchor_analysis.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_02  anchor analysis")
+    print("  [OK]  fig_02  anchor analysis")
 
     # ── Fig 03: SE-FPN architecture diagram ────────────────────────────────────
     fig, ax = plt.subplots(figsize=(16, 6))
@@ -1243,11 +1243,11 @@ def generate_figures(per_class_ap: Optional[dict] = None,
         _arr(8.3, ya, 8.8, 3.0)
     _arr(10.8, 3.0, 11.2, 3.0); _arr(13.0, 3.0, 13.4, 3.0); _arr(15.2, 3.0, 15.4, 3.0)
 
-    ax.text(7.4, 5.85, "★ Novel: SE channel attention recalibrates disease-discriminative features",
+    ax.text(7.4, 5.85, "(*) Novel: SE channel attention recalibrates disease-discriminative features",
             ha="center", fontsize=9, color="#8E44AD", style="italic")
     out = OUTPUT_DIR / "fig_03_se_fpn_architecture.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_03  SE-FPN architecture")
+    print("  [OK]  fig_03  SE-FPN architecture")
 
     # ── Fig 04: SE channel attention detail ────────────────────────────────────
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
@@ -1298,7 +1298,7 @@ def generate_figures(per_class_ap: Optional[dict] = None,
     plt.tight_layout()
     out = OUTPUT_DIR / "fig_04_se_attention_detail.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_04  SE attention detail")
+    print("  [OK]  fig_04  SE attention detail")
 
     # ── Fig 05: EMA weight visualisation ──────────────────────────────────────
     fig, axes = plt.subplots(1, 2, figsize=(13, 5))
@@ -1331,12 +1331,12 @@ def generate_figures(per_class_ap: Optional[dict] = None,
         ax.annotate(f"  {w}ep", (d, w), fontsize=9)
     ax.set_xlabel("EMA Decay")
     ax.set_ylabel("Effective warm-up epochs to 90% convergence")
-    ax.set_title(f"EMA Decay vs Convergence  (★ = {EMA_DECAY})")
+    ax.set_title(f"EMA Decay vs Convergence  ((*) = {EMA_DECAY})")
     ax.axvline(EMA_DECAY, color="#27AE60", linestyle="--", lw=1.5)
     plt.tight_layout()
     out = OUTPUT_DIR / "fig_05_ema_weights.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_05  EMA weights")
+    print("  [OK]  fig_05  EMA weights")
 
     # ── Fig 06: SGDR warm-restarts LR schedule ────────────────────────────────
     fig, ax = plt.subplots(figsize=(12, 4))
@@ -1375,7 +1375,7 @@ def generate_figures(per_class_ap: Optional[dict] = None,
     ax.legend(["LR schedule", "Warm-up phase"])
     out = OUTPUT_DIR / "fig_06_lr_schedule.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_06  LR schedule (SGDR)")
+    print("  [OK]  fig_06  LR schedule (SGDR)")
 
     # ── Fig 07: Hard-negative category distribution ────────────────────────────
     fig, axes = plt.subplots(1, 2, figsize=(13, 5))
@@ -1418,7 +1418,7 @@ def generate_figures(per_class_ap: Optional[dict] = None,
     plt.tight_layout()
     out = OUTPUT_DIR / "fig_07_hard_negatives.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_07  hard negative categories")
+    print("  [OK]  fig_07  hard negative categories")
 
     # ── Fig 08: Training metrics (post-training) ──────────────────────────────
     history = _load_metrics()
@@ -1430,7 +1430,7 @@ def generate_figures(per_class_ap: Optional[dict] = None,
             ("train_box_reg", "Box Reg Loss",        "#E67E22"),
             ("train_obj",     "Objectness Loss",     "#9B59B6"),
             ("val_map50",     "Val mAP@0.5",         "#27AE60"),
-            ("val_map50_ema", "Val mAP@0.5 (EMA ★)", "#1ABC9C"),
+            ("val_map50_ema", "Val mAP@0.5 (EMA (*))", "#1ABC9C"),
             ("lr",            "Learning Rate",       "#7F8C8D"),
         ]
         avail = [(k, l, c) for k, l, c in series if history.get(k)]
@@ -1447,7 +1447,7 @@ def generate_figures(per_class_ap: Optional[dict] = None,
         plt.tight_layout()
         out = OUTPUT_DIR / "fig_08_training_metrics.png"
         plt.savefig(out); plt.close(); saved.append(out)
-        print("  ✓  fig_08  training metrics")
+        print("  [OK]  fig_08  training metrics")
     else:
         print("  –  fig_08 skipped (run after training)")
 
@@ -1483,7 +1483,7 @@ def generate_figures(per_class_ap: Optional[dict] = None,
         plt.tight_layout()
         out = OUTPUT_DIR / "fig_09_per_class_ap.png"
         plt.savefig(out); plt.close(); saved.append(out)
-        print("  ✓  fig_09  per-class AP@0.5")
+        print("  [OK]  fig_09  per-class AP@0.5")
     else:
         print("  –  fig_09 skipped (no evaluation results)")
 
@@ -1511,7 +1511,7 @@ def generate_figures(per_class_ap: Optional[dict] = None,
         plt.tight_layout()
         out = OUTPUT_DIR / "fig_10_pr_curves.png"
         plt.savefig(out); plt.close(); saved.append(out)
-        print("  ✓  fig_10  precision-recall curves")
+        print("  [OK]  fig_10  precision-recall curves")
     else:
         print("  –  fig_10 skipped (no evaluation results)")
 
@@ -1541,7 +1541,7 @@ def generate_figures(per_class_ap: Optional[dict] = None,
         plt.tight_layout()
         out = OUTPUT_DIR / "fig_11_confusion_matrix.png"
         plt.savefig(out); plt.close(); saved.append(out)
-        print("  ✓  fig_11  detection confusion matrix")
+        print("  [OK]  fig_11  detection confusion matrix")
     else:
         print("  –  fig_11 skipped (no evaluation results)")
 
@@ -1581,7 +1581,7 @@ def generate_figures(per_class_ap: Optional[dict] = None,
     plt.tight_layout()
     out = OUTPUT_DIR / "fig_12_gradient_accumulation.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_12  gradient accumulation")
+    print("  [OK]  fig_12  gradient accumulation")
 
     # ── Fig 13: Cross-model comparison ────────────────────────────────────────
     # Load results from other pipelines if available
@@ -1618,7 +1618,7 @@ def generate_figures(per_class_ap: Optional[dict] = None,
         if valid_final:
             bench = benchmark_fps if False else None
             compare_models.append({
-                "label": "SE-FPN\n(this model ★)", "color": "#27AE60",
+                "label": "SE-FPN\n(this model (*))", "color": "#27AE60",
                 "map50": max(valid_final),
                 "fps":   0.0, "params": 43.5,
             })
@@ -1639,7 +1639,7 @@ def generate_figures(per_class_ap: Optional[dict] = None,
         ax.set_ylim(0, max(maps) * 1.2 if maps else 1.0)
         out = OUTPUT_DIR / "fig_13_cross_model_comparison.png"
         plt.savefig(out); plt.close(); saved.append(out)
-        print("  ✓  fig_13  cross-model comparison")
+        print("  [OK]  fig_13  cross-model comparison")
     else:
         print("  –  fig_13 skipped (no comparison data)")
 
@@ -1673,7 +1673,7 @@ def generate_figures(per_class_ap: Optional[dict] = None,
         plt.tight_layout()
         out = OUTPUT_DIR / "fig_14_bbox_geometry.png"
         plt.savefig(out); plt.close(); saved.append(out)
-        print("  ✓  fig_14  bounding box geometry")
+        print("  [OK]  fig_14  bounding box geometry")
 
     # ── Fig 15: Summary panel ─────────────────────────────────────────────────
     fig = plt.figure(figsize=(18, 10))
@@ -1751,7 +1751,7 @@ def generate_figures(per_class_ap: Optional[dict] = None,
 
     out = OUTPUT_DIR / "fig_15_summary.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_15  summary panel")
+    print("  [OK]  fig_15  summary panel")
 
     print(f"\n  Total figures saved: {len(saved)}")
 
@@ -1947,7 +1947,7 @@ def main():
                 eval_ema  = evaluate(model, val_loader, device, use_tta=use_tta)
                 val_map_ema = eval_ema["map50"]
                 ema.restore(model)
-                print(f"  [Eval EMA]  epoch {epoch:3d}  mAP@0.5={val_map_ema:.4f}  (★ EMA)")
+                print(f"  [Eval EMA]  epoch {epoch:3d}  mAP@0.5={val_map_ema:.4f}  ((*) EMA)")
 
         history["val_map50"].append(val_map)
         history["val_map50_ema"].append(val_map_ema)
@@ -2003,7 +2003,7 @@ def main():
         try:
             write_final_eval(final_eval, model, split="valid")
         except Exception as _exc:
-            print(f"  ⚠  benchmark summary skipped: {_exc}")
+            print(f"  [WARN]  benchmark summary skipped: {_exc}")
 
         bench = benchmark_fps(model, device)
         print(f"  Benchmark: {bench['fps']:.1f} FPS  full={bench['full_ms']:.1f}ms  "

@@ -16,7 +16,7 @@ if not BEST_PT.exists():
     candidates = sorted(RUNS_DIR.glob("*/weights/best.pt"), key=lambda p: p.stat().st_mtime)
     if candidates:
         BEST_PT = candidates[-1]
-        print(f"⚠️ Using fallback checkpoint: {BEST_PT}")
+        print(f"[WARN] Using fallback checkpoint: {BEST_PT}")
     else:
         raise FileNotFoundError("No trained model found. Please train the YOLO model first.")
 
@@ -56,7 +56,7 @@ def main():
     src_onnx = Path(str(onnx_result))
     dst_onnx = MODELS_DIR / "crop_disease_yolo26.onnx"
     shutil.copy2(src_onnx, dst_onnx)
-    print(f"✅ ONNX export complete → {dst_onnx} ({dst_onnx.stat().st_size / 1_048_576:.1f} MB)")
+    print(f"[OK] ONNX export complete → {dst_onnx} ({dst_onnx.stat().st_size / 1_048_576:.1f} MB)")
 
     # ─── Export to ExecuTorch ─────────────────────────────────────────────────
     print("\nExporting to ExecuTorch (.pte) for Android/Kotlin integration...")
@@ -77,9 +77,9 @@ def main():
     dst_pte = MODELS_DIR / "crop_disease_yolo26.pte"
     if pte_src and pte_src.exists():
         shutil.copy2(pte_src, dst_pte)
-        print(f"✅ ExecuTorch export complete → {dst_pte} ({dst_pte.stat().st_size / 1_048_576:.1f} MB)")
+        print(f"[OK] ExecuTorch export complete → {dst_pte} ({dst_pte.stat().st_size / 1_048_576:.1f} MB)")
     else:
-        print(f"⚠️ Could not locate .pte file. Check: {et_path}")
+        print(f"[WARN] Could not locate .pte file. Check: {et_path}")
 
     # ─── Write Metadata YAML ──────────────────────────────────────────────────
     metadata = {

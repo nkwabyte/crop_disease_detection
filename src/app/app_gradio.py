@@ -68,7 +68,7 @@ PALETTE = [
     (142, 68,  173), (243, 156, 18),  (22,  160, 133),
 ]
 
-CROP_ICONS = {"Corn": "🌽", "Pepper": "🫑", "Tomato": "🍅"}
+CROP_ICONS = {"Corn": "", "Pepper": "", "Tomato": ""}
 CROP_COLORS = {"Corn": "#f0a500", "Pepper": "#27ae60", "Tomato": "#e74c3c"}
 
 
@@ -165,7 +165,7 @@ def run_yolo(
                 "class_id"  : cls_id,
                 "class_name": CLASS_NAMES[cls_id],
                 "crop"      : crop,
-                "icon"      : CROP_ICONS.get(crop, "🌿"),
+                "icon"      : CROP_ICONS.get(crop, ""),
                 "confidence": cf,
                 "bbox"      : (x1, y1, x2, y2),
                 "color"     : PALETTE[cls_id],
@@ -400,7 +400,7 @@ def make_conf_chart(detections: list[dict], conf_threshold: float = 0.5) -> plt.
 def _stage1_html(crop: str, crop_conf: float) -> str:
     """Render the Stage 1 result banner."""
     color = CROP_COLORS.get(crop, "#e74c3c")
-    icon  = CROP_ICONS.get(crop, "❓")
+    icon  = CROP_ICONS.get(crop, "")
     return f"""
     <div style="
         display:flex; align-items:center; gap:12px;
@@ -433,7 +433,7 @@ def _rejected_html(crop_conf: float, threshold: float) -> str:
         background:rgba(231,76,60,0.07);
         border:1px solid rgba(231,76,60,0.4);
         font-size:0.95rem; color:#dde6f0;">
-      <span style="font-size:1.6rem;">🚫</span>
+      <span style="font-size:1.2rem; font-weight:bold;">[REJECTED]</span>
       <div>
         <span style="color:#e74c3c; font-weight:700;">Unknown crop — rejected</span>
         <span style="color:#8fa3b1; margin-left:6px;">
@@ -451,7 +451,7 @@ def _no_clf_html() -> str:
         background:rgba(243,156,18,0.07);
         border:1px solid rgba(243,156,18,0.35);
         font-size:0.88rem; color:#f0c060;">
-      ⚠️  Stage 1 classifier not loaded — running disease detection without crop filter.
+      [WARN] Stage 1 classifier not loaded — running disease detection without crop filter.
       Train the classifier first: <code>python train_classifier.py</code>
     </div>"""
 
@@ -475,8 +475,8 @@ def predict(
 
     if image is None:
         draw = ImageDraw.Draw(placeholder)
-        draw.text((160, 185), "Upload a crop leaf image to begin  ☝️", fill=(100, 130, 160))
-        return placeholder, "", [], make_conf_chart([], conf_threshold), "⏳ Awaiting image…"
+        draw.text((160, 185), "Upload a crop leaf image to begin", fill=(100, 130, 160))
+        return placeholder, "", [], make_conf_chart([], conf_threshold), "Awaiting image…"
 
     # ── Stage 1: crop-type classifier ─────────────────────────────────────────
     clf = get_classifier(clf_path, clf_threshold)
@@ -493,7 +493,7 @@ def predict(
             annotated  = draw_rejected(image, crop_conf)
             stage1_html = _rejected_html(crop_conf, clf_threshold)
             status = (
-                f"🚫  Rejected by Stage 1 classifier — "
+                f"[Rejected] Rejected by Stage 1 classifier — "
                 f"max confidence {crop_conf:.1%} < threshold {clf_threshold:.0%}.  "
                 "Not a recognised crop leaf."
             )
@@ -507,7 +507,7 @@ def predict(
         err_img = Image.new("RGB", (640, 200), (40, 10, 10))
         draw    = ImageDraw.Draw(err_img)
         draw.text((20, 85), f"YOLO model not found: {model_path}", fill=(231, 76, 60))
-        return err_img, stage1_html, [], make_conf_chart([], conf_threshold), f"❌ YOLO model not found: {model_path}"
+        return err_img, stage1_html, [], make_conf_chart([], conf_threshold), f"[ERROR] YOLO model not found: {model_path}"
 
     detections, elapsed = run_yolo(image, conf_threshold, iou_threshold,
                                    model_path, allowed_ids)
@@ -521,14 +521,14 @@ def predict(
         top    = detections[0]
         n      = len(detections)
         status = (
-            f"✅  {n} detection{'s' if n > 1 else ''} found{crop_tag}  ·  "
+            f"[OK] {n} detection{'s' if n > 1 else ''} found{crop_tag}  ·  "
             f"Top: {top['icon']} {top['class_name'].replace('_', ' ')} "
             f"({top['confidence']:.1%})  ·  "
             f"Inference: {elapsed * 1000:.0f} ms  [{INFER_DEVICE}]"
         )
     else:
         status = (
-            f"🔍  No disease detected above {conf_threshold:.0%} confidence{crop_tag}.  "
+            f"No disease detected above {conf_threshold:.0%} confidence{crop_tag}.  "
             f"Inference: {elapsed * 1000:.0f} ms  [{INFER_DEVICE}]"
         )
 
@@ -612,21 +612,21 @@ with gr.Blocks(title="Crop Disease Detector", theme=_THEME, css=CUSTOM_CSS) as d
     # ── Header ────────────────────────────────────────────────────────────────
     gr.HTML("""
     <div style="text-align:center; padding: 28px 0 14px;">
-        <div style="font-size:3rem; margin-bottom:8px;">🌿</div>
+        <div style="font-size:1.4rem; font-weight:bold; margin-bottom:8px;">Crop Disease Detector</div>
         <h1 class="title-text">Crop Disease Detector</h1>
         <p class="sub-text">
             Two-Stage Pipeline &nbsp;·&nbsp;
             Stage 1: EfficientNet-B2 crop classifier &nbsp;·&nbsp;
             Stage 2: YOLO26 disease detector &nbsp;·&nbsp;
             23 disease classes &nbsp;·&nbsp;
-            🌽 Corn &nbsp;·&nbsp; 🫑 Pepper &nbsp;·&nbsp; 🍅 Tomato
+            Corn &nbsp;·&nbsp; Pepper &nbsp;·&nbsp; Tomato
         </p>
     </div>
     """)
 
     # ── Status bar ────────────────────────────────────────────────────────────
     status_box = gr.Textbox(
-        value="⏳ Upload a crop leaf image to begin…",
+        value="Upload a crop leaf image to begin…",
         interactive=False,
         elem_classes=["status-box"],
         show_label=False,
@@ -648,7 +648,7 @@ with gr.Blocks(title="Crop Disease Detector", theme=_THEME, css=CUSTOM_CSS) as d
                 sources=["upload", "clipboard"],
             )
 
-            with gr.Accordion("⚙️  Pipeline settings", open=True):
+            with gr.Accordion("Pipeline settings", open=True):
                 clf_slider = gr.Slider(
                     minimum=0.30, maximum=0.90, value=0.55, step=0.01,
                     label="Stage 1 — Classifier confidence threshold",
@@ -665,7 +665,7 @@ with gr.Blocks(title="Crop Disease Detector", theme=_THEME, css=CUSTOM_CSS) as d
                     info="Controls bounding box overlap deduplication",
                 )
 
-            with gr.Accordion("🔧  Advanced — Model paths", open=False):
+            with gr.Accordion("Advanced — Model paths", open=False):
                 clf_path_box = gr.Textbox(
                     label="Classifier model path (best.pth)",
                     value=auto_clf,
@@ -677,13 +677,13 @@ with gr.Blocks(title="Crop Disease Detector", theme=_THEME, css=CUSTOM_CSS) as d
                     info="Produced by train.py",
                 )
 
-            run_btn = gr.Button("🔍  Analyse Image", variant="primary", size="lg")
+            run_btn = gr.Button("Analyse Image", variant="primary", size="lg")
 
         # ── Right panel: outputs ──────────────────────────────────────────────
         with gr.Column(scale=6):
             with gr.Tabs():
 
-                with gr.Tab("🔍 Annotated Image"):
+                with gr.Tab("Annotated Image"):
                     img_output = gr.Image(
                         label="Detection result",
                         type="pil",
@@ -691,7 +691,7 @@ with gr.Blocks(title="Crop Disease Detector", theme=_THEME, css=CUSTOM_CSS) as d
                         show_label=False,
                     )
 
-                with gr.Tab("📋 Detections Table"):
+                with gr.Tab("Detections Table"):
                     table_output = gr.Dataframe(
                         headers=["Disease", "Crop", "Confidence", "Bounding Box"],
                         datatype=["str", "str", "str", "str"],
@@ -701,7 +701,7 @@ with gr.Blocks(title="Crop Disease Detector", theme=_THEME, css=CUSTOM_CSS) as d
                         row_count=(1, "dynamic"),
                     )
 
-                with gr.Tab("📊 Confidence Chart"):
+                with gr.Tab("Confidence Chart"):
                     chart_output = gr.Plot(label="Detection confidence breakdown")
 
     # ── Example images ────────────────────────────────────────────────────────
@@ -709,7 +709,7 @@ with gr.Blocks(title="Crop Disease Detector", theme=_THEME, css=CUSTOM_CSS) as d
     sample_images = sorted(sample_dir.glob("*.jpg"))[:6] if sample_dir.exists() else []
 
     if sample_images:
-        gr.HTML('<p style="color:#8fa3b1; font-size:0.85rem; margin:16px 0 4px;">📁 Sample images from test set:</p>')
+        gr.HTML('<p style="color:#8fa3b1; font-size:0.85rem; margin:16px 0 4px;">Sample images from test set:</p>')
         gr.Examples(
             examples=[[str(p)] for p in sample_images],
             inputs=img_input,
@@ -718,7 +718,7 @@ with gr.Blocks(title="Crop Disease Detector", theme=_THEME, css=CUSTOM_CSS) as d
         )
 
     # ── About accordion ───────────────────────────────────────────────────────
-    with gr.Accordion("ℹ️  About the two-stage pipeline", open=False):
+    with gr.Accordion("About the two-stage pipeline", open=False):
         gr.Markdown("""
         ## How it works
 
@@ -744,7 +744,7 @@ with gr.Blocks(title="Crop Disease Detector", theme=_THEME, css=CUSTOM_CSS) as d
         false positives (e.g., the detector predicting a Tomato disease on a Corn leaf).
 
         ## Supported disease classes (23)
-        | 🌽 Corn (5) | 🫑 Pepper (10) | 🍅 Tomato (8) |
+        | Corn (5) | Pepper (10) | Tomato (8) |
         |-------------|----------------|---------------|
         | Cercospora Leaf Spot | Bacterial Spot | Bacterial Spot |
         | Common Rust | Cercospora | Early Blight |
@@ -767,7 +767,7 @@ with gr.Blocks(title="Crop Disease Detector", theme=_THEME, css=CUSTOM_CSS) as d
     <div style="text-align:center; color:#4a5568; font-size:0.78rem;
                 padding:24px 0 8px; border-top:1px solid rgba(255,255,255,0.05);
                 margin-top:24px;">
-        🌿 Crop Disease Detector &nbsp;·&nbsp; Two-Stage Pipeline &nbsp;·&nbsp;
+        Crop Disease Detector &nbsp;·&nbsp; Two-Stage Pipeline &nbsp;·&nbsp;
         EfficientNet-B2 + YOLO26 &nbsp;·&nbsp; Ghana Crop Disease Challenge Dataset
     </div>
     """)
