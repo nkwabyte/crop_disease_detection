@@ -55,6 +55,7 @@ from src.yolo.config import (
     MODEL_SIZE,
     IMG_SIZE,
     BASE_BATCH,
+    CUDA_BATCH,
     EPOCHS_DEFAULT,
     PATIENCE,
     CONF_THRESHOLD,
@@ -225,8 +226,8 @@ def resolve_device() -> tuple:
     if torch.cuda.is_available():
         n = torch.cuda.device_count()
         if n > 1:
-            return list(range(n)), BASE_BATCH * n, True   # multi-GPU DDP
-        return 0, BASE_BATCH, True
+            return list(range(n)), CUDA_BATCH * n, True   # multi-GPU DDP
+        return 0, CUDA_BATCH, True
     if torch.backends.mps.is_available():
         return "mps", BASE_BATCH, False   # AMP off — MPS fp16 index bug
     return "cpu", BASE_BATCH, False
@@ -901,7 +902,7 @@ Examples:
             imgsz       = IMG_SIZE,
             batch       = batch,
             cache       = "disk",
-            workers     = 0 if is_mps else 8,
+            workers     = 0 if is_mps else 16,
 
             # ── Training schedule ─────────────────────────────────────────────
             epochs      = epochs,

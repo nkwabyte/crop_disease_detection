@@ -26,7 +26,8 @@ IMG_SIZE    = 640
 # ── Hyperparameter Defaults ────────────────────────────────────────────────────
 EPOCHS_DEFAULT        = 30
 PATIENCE_DEFAULT      = 8
-BATCH_SIZE            = 4    # safe on 24 GB unified memory
+BATCH_SIZE            = 4    # default on MPS/CPU (M4 Pro 24 GB unified memory)
+CUDA_BATCH_SIZE       = 16   # default when a CUDA GPU is detected (e.g. 96 GB RTX PRO 6000)
 ACCUM_STEPS           = 2    # gradient accumulation steps for SE-FPN
 LR0                   = 5e-3
 WEIGHT_DECAY          = 5e-4

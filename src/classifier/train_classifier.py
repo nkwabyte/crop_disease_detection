@@ -96,6 +96,7 @@ from src.classifier.config import (
     IMG_SIZE,
     EPOCHS_DEFAULT,
     BATCH_DEFAULT,
+    CUDA_BATCH,
     LR_DEFAULT,
     WEIGHT_DECAY,
     PATIENCE,
@@ -437,10 +438,11 @@ def train(args: argparse.Namespace) -> None:
     # to start.  persistent_workers=True (set inside _make_loaders) means workers
     # are initialised once and reused across all epochs.
     # GPU servers typically have 16-64 CPU cores — use more of them for data loading.
-    num_workers = min(8, os.cpu_count() or 1) if device.type == "cuda" else min(4, os.cpu_count() or 1)
-    print(f"DataLoader workers: {num_workers}  pin_memory: {pin_memory}")
+    num_workers = min(16, os.cpu_count() or 1) if device.type == "cuda" else min(4, os.cpu_count() or 1)
+    batch = args.batch_size if args.batch_size is not None else (CUDA_BATCH if device.type == "cuda" else BATCH_DEFAULT)
+    print(f"Batch size: {batch}  DataLoader workers: {num_workers}  pin_memory: {pin_memory}")
     train_loader, valid_loader, test_loader = _make_loaders(
-        args.batch_size, num_workers, pin_memory
+        batch, num_workers, pin_memory
     )
 
     # ── Model ─────────────────────────────────────────────────────────────────
@@ -576,7 +578,8 @@ def figures_only(args: argparse.Namespace) -> None:
         history = json.load(f)
 
     num_workers  = min(4, os.cpu_count() or 1)
-    _, _, test_loader = _make_loaders(args.batch_size, num_workers, pin_memory=False)
+    test_batch = args.batch_size if args.batch_size is not None else BATCH_DEFAULT
+    _, _, test_loader = _make_loaders(test_batch, num_workers, pin_memory=False)
 
     true_labels, pred_labels, _ = collect_predictions(model, test_loader, device)
     fig_training_curves(history)
@@ -678,7 +681,8 @@ def main() -> None:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("--epochs",      type=int,   default=EPOCHS_DEFAULT)
-    parser.add_argument("--batch-size",  type=int,   default=BATCH_DEFAULT)
+    parser.add_argument("--batch-size",  type=int,   default=None,
+                        help=f"Override batch size (default: {BATCH_DEFAULT} MPS/CPU, {CUDA_BATCH} CUDA)")
     parser.add_argument("--lr",          type=float, default=LR_DEFAULT)
     parser.add_argument("--confidence",  type=float, default=CONF_DEFAULT,
                         help="Min softmax confidence to accept a crop prediction")

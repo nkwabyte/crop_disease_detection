@@ -74,7 +74,7 @@ from src.swin.config import (
     TRAIN_IMG_DIR, VAL_IMG_DIR, TEST_IMG_DIR,
     NUM_CLASSES, IMG_SIZE,
     SWIN_IN_CHANNELS, FPN_OUT_CHANNELS,
-    EPOCHS_DEFAULT, PATIENCE_DEFAULT as PATIENCE, BATCH_SIZE, ACCUM_STEPS,
+    EPOCHS_DEFAULT, PATIENCE_DEFAULT as PATIENCE, BATCH_SIZE, CUDA_BATCH_SIZE, ACCUM_STEPS,
     LR0, WEIGHT_DECAY, WARMUP_EPOCHS, FREEZE_BACKBONE_EPOCHS, GRAD_CLIP,
     EVAL_EVERY, NUM_NEGATIVES, CONF_THRESHOLD, IOU_THRESHOLD,
     CLASS_NAMES, CLASS_NAMES_DISPLAY,
@@ -884,15 +884,17 @@ def export_model(model: nn.Module) -> None:
 # Main
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _make_loaders(neg_paths, batch, workers):
+def _make_loaders(neg_paths, batch, workers, pin=False):
     train_df = _load_csv(TRAIN_CSV)
     val_df   = _load_csv(VAL_CSV)
     train_ds = CropDiseaseDataset(train_df, TRAIN_IMG_DIR, get_train_transform(), neg_paths)
     val_ds   = CropDiseaseDataset(val_df, VAL_IMG_DIR, get_val_transform())
     train_ld = DataLoader(train_ds, batch_size=batch, shuffle=True, num_workers=workers,
-                          collate_fn=collate_fn, pin_memory=False)
+                          collate_fn=collate_fn, pin_memory=pin,
+                          persistent_workers=(workers > 0))
     val_ld   = DataLoader(val_ds, batch_size=batch, shuffle=False, num_workers=workers,
-                          collate_fn=collate_fn, pin_memory=False)
+                          collate_fn=collate_fn, pin_memory=pin,
+                          persistent_workers=(workers > 0))
     return train_ld, val_ld, len(train_ds), len(val_ds)
 
 
@@ -910,10 +912,12 @@ def main() -> None:
 
     dry_run = args.dry_run or os.environ.get("DRY_RUN") == "1"
     epochs  = args.epochs if args.epochs is not None else (2 if dry_run else EPOCHS_DEFAULT)
-    batch   = args.batch_size if args.batch_size is not None else BATCH_SIZE
 
     device  = resolve_device()
-    workers = 0 if device.type == "mps" else min(8, os.cpu_count() or 1)
+    cuda    = device.type == "cuda"
+    batch   = args.batch_size if args.batch_size is not None else (CUDA_BATCH_SIZE if cuda else BATCH_SIZE)
+    workers = 0 if device.type == "mps" else min(16 if cuda else 8, os.cpu_count() or 1)
+    pin     = cuda
 
     # ── figures-only ─────────────────────────────────────────────────────────
     if args.figures_only:
@@ -938,7 +942,7 @@ def main() -> None:
     neg_paths = prepare_hard_negatives(NUM_NEGATIVES, skip=args.skip_negatives)
 
     # ── Step 2 — train ───────────────────────────────────────────────────────
-    train_ld, val_ld, n_train, n_val = _make_loaders(neg_paths, batch, workers)
+    train_ld, val_ld, n_train, n_val = _make_loaders(neg_paths, batch, workers, pin)
     log_startup(device, n_train, n_val, epochs, batch, dry_run)
 
     model = build_model(pretrained=not args.no_pretrained).to(device)
@@ -1014,7 +1018,7 @@ def main() -> None:
     test_df = _load_csv(TEST_CSV)
     test_ds = CropDiseaseDataset(test_df, TEST_IMG_DIR, get_val_transform())
     test_ld = DataLoader(test_ds, batch_size=batch, shuffle=False, num_workers=workers,
-                         collate_fn=collate_fn)
+                         collate_fn=collate_fn, pin_memory=pin)
     print("\n  Final evaluation on test split …")
     final_result = evaluate(model, test_ld, device, num_classes=23)
     print(f"  Final mAP@0.5 = {final_result['map50']:.4f}")

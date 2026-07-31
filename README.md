@@ -35,9 +35,13 @@ Main training runs on the GPU server; local development is on an Apple Silicon M
   > Python 3.14 is **not** usable here: `torch`/`torchvision` have 3.14 wheels but
   > **`executorch` does not**, and executorch produces the `.pte` mobile artifacts.
 
-- **GPU server (Python 3.13):** the pinned [`requirements.txt`](requirements.txt) was
-  frozen on 3.13 (`audioop-lts`, `ipython 9.12`, … require ≥3.12/3.13) and is kept for
-  that interpreter.
+- **GPU server (Linux + CUDA):** use [`requirements-server.txt`](requirements-server.txt)
+  (torch pulls the CUDA build automatically on Linux) and follow
+  [`docs/09_gpu_server.md`](docs/09_gpu_server.md) for the full setup + training sweep. All
+  training scripts auto-detect CUDA and scale batch size / workers / AMP to the GPU
+  (see the table in that doc); `scripts/train_all_gpu.sh` runs every model end-to-end.
+  The original pinned [`requirements.txt`](requirements.txt) was frozen on Python 3.13 and
+  is kept for that interpreter.
 
 ## Documentation
 
@@ -52,6 +56,8 @@ Detailed documentation for each model is in the [`docs/`](docs/) folder:
 | [`docs/05_sefpn_final_model.md`](docs/05_sefpn_final_model.md) | SE-FPN final model — all 8 research contributions in detail |
 | [`docs/06_two_stage_pipeline.md`](docs/06_two_stage_pipeline.md) | Pipeline integration — code examples, threshold tuning, limitations |
 | [`docs/07_dataset.md`](docs/07_dataset.md) | Dataset — splits, class distribution, label conventions, citation |
+| [`docs/08_next_steps.md`](docs/08_next_steps.md) | Roadmap — additional models/experiments to strengthen the paper |
+| [`docs/09_gpu_server.md`](docs/09_gpu_server.md) | GPU server — setup, CUDA auto-scaling, training sweep, export |
 
 ---
 

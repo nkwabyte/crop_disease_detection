@@ -16,6 +16,7 @@ IMG_SIZE      = 260                     # EfficientNet-B2 native resolution
 # ── Hyperparameters ───────────────────────────────────────────────────────────
 EPOCHS_DEFAULT = 40
 BATCH_DEFAULT  = 64                     # M4 Pro 24 GB handles batch-64 with headroom
+CUDA_BATCH     = 128                    # default when a CUDA GPU is detected (96 GB RTX PRO 6000)
 LR_DEFAULT     = 1e-4
 WEIGHT_DECAY   = 1e-4
 PATIENCE       = 8                      # early-stopping patience (epochs)
