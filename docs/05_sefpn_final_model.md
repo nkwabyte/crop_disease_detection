@@ -1,6 +1,6 @@
 # SE-FPN Faster RCNN — Final Production Model
 
-**Script:** `train_final.py`  
+**Script:** `src/fasterrcnn/train_final.py`  
 **Output directory:** `final_output/`  
 **Role:** Primary research contribution; all 8 custom innovations evaluated against the `resnet50_300` ablation baseline
 

@@ -1,6 +1,6 @@
 # Faster RCNN v2 Baseline Detector
 
-**Script:** `train_fasterrcnn.py`  
+**Script:** `src/fasterrcnn/train_fasterrcnn.py`  
 **Output directory:** `fasterrcnn_output/`  
 **Role:** Two-stage detection baseline; reference point for SE-FPN ablation
 

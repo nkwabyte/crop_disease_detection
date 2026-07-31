@@ -6,11 +6,12 @@ from datetime import datetime
 from executorch.exir import to_edge
 from executorch.backends.xnnpack.partition.xnnpack_partitioner import XnnpackPartitioner
 
-from train_classifier import build_model, NUM_CLASSES, IMG_SIZE, CROP_CLASSES
+from src.classifier.train_classifier import build_model
+from src.classifier.config import PROJECT_ROOT, OUTPUT_DIR, NUM_CLASSES, IMG_SIZE, CROP_CLASSES
 
 def main():
-    project_root = Path.cwd()
-    output_dir = project_root / "outputs" / "classifier_output"
+    project_root = PROJECT_ROOT
+    output_dir = OUTPUT_DIR
     best_pth = output_dir / "best.pth"
     models_dir = project_root / "models"
     models_dir.mkdir(exist_ok=True)

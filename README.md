@@ -9,12 +9,12 @@ Five training scripts are provided:
 
 | Script | Purpose | Architecture | Output |
 | ------ | ------- | ------------ | ------ |
-| `generate_classifier_csv.py` | Build classifier CSVs | — | `dataset/classifier_*.csv` |
-| `train_classifier.py` | **Stage 1 — Crop classifier** | EfficientNet-B2 | `outputs/classifier_output/` |
-| `train.py` | Stage 2 — YOLO26 detector | YOLO26n (ultralytics) | `outputs/yolo_output/` |
-| `train_fasterrcnn.py` | Stage 2 — Faster RCNN baseline | ResNet-50-FPN-v2 | `outputs/fasterrcnn_output/` |
-| `train_alt_fasterrcnn.py` | Ablation study | 7 Faster RCNN variants | `outputs/alt_fasterrcnn_output/` |
-| `train_final.py` | Stage 2 — **SE-FPN final model** | ResNet-50-FPN-v2 + SE attention | `outputs/final_output/` |
+| `src/classifier/generate_classifier_csv.py` | Build classifier CSVs | — | `dataset/classifier_*.csv` |
+| `src/classifier/train_classifier.py` | **Stage 1 — Crop classifier** | EfficientNet-B2 | `outputs/classifier_output/` |
+| `src/yolo/train.py` | Stage 2 — YOLO26 detector | YOLO26n (ultralytics) | `outputs/yolo_output/` |
+| `src/fasterrcnn/train_fasterrcnn.py` | Stage 2 — Faster RCNN baseline | ResNet-50-FPN-v2 | `outputs/fasterrcnn_output/` |
+| `src/fasterrcnn/train_alt_fasterrcnn.py` | Ablation study | 7 Faster RCNN variants | `outputs/alt_fasterrcnn_output/` |
+| `src/fasterrcnn/train_final.py` | Stage 2 — **SE-FPN final model** | ResNet-50-FPN-v2 + SE attention | `outputs/final_output/` |
 
 ## Documentation
 
@@ -36,17 +36,27 @@ Detailed documentation for each model is in the [`docs/`](docs/) folder:
 
 ```text
 crop_disease_detection/
-├── generate_classifier_csv.py ← Build crop-type classifier CSVs from YOLO labels
-├── train_classifier.py        ← Stage 1: EfficientNet-B2 crop-type classifier
-├── train.py                   ← Stage 2: YOLO26 detector
-├── train_fasterrcnn.py        ← Stage 2: Faster RCNN v2 baseline
-├── train_alt_fasterrcnn.py    ← Faster RCNN ablation study (7 configurations)
-├── train_final.py             ← Stage 2: SE-FPN final model (research contributions)
-├── main.ipynb                 ← Kaggle-compatible YOLO training notebook
-├── export.ipynb               ← ONNX + ExecuTorch export + Android/Kotlin guide
-├── detector-torch.ipynb       ← Original Faster RCNN notebook (upgraded by train_fasterrcnn.py)
-├── app_gradio.py              ← Gradio web demo (run after training)
-├── app_streamlit.py           ← Streamlit web demo (run after training)
+├── notebooks/                 ← Jupyter notebooks
+│   ├── main.ipynb             ← Kaggle-compatible YOLO training notebook
+│   ├── export.ipynb           ← ONNX + ExecuTorch export + Android/Kotlin guide
+│   └── detector-torch.ipynb   ← Original Faster RCNN notebook
+├── src/                       ← Source code organized by model domain
+│   ├── yolo/                  ← YOLO26 detector
+│   │   ├── train.py           ← Stage 2: YOLO26 detector pipeline
+│   │   └── export_yolo.py     ← YOLO exporter
+│   ├── fasterrcnn/            ← Faster R-CNN models
+│   │   ├── train_fasterrcnn.py     ← Stage 2: Faster R-CNN v2 baseline
+│   │   ├── train_alt_fasterrcnn.py ← Faster R-CNN ablation study (7 configs)
+│   │   └── train_final.py          ← Stage 2: SE-FPN final model
+│   ├── classifier/            ← Crop-type classifier
+│   │   ├── train_classifier.py     ← Stage 1: EfficientNet-B2 crop-type classifier
+│   │   ├── export_classifier.py    ← Classifier ExecuTorch/ONNX exporter
+│   │   └── generate_classifier_csv.py ← Build classifier CSVs from YOLO labels
+│   ├── app/                   ← Web interfaces
+│   │   └── app_gradio.py      ← Gradio web demo
+│   └── utils/                 ← Utility scripts
+│       ├── check_labels.py    ← Validate YOLO dataset labels
+│       └── download_disease_images.py ← Reference image downloader
 ├── requirements.txt           ← All Python dependencies
 ├── data_fixed.yaml            ← Auto-generated at YOLO training time (do not edit)
 │
@@ -218,7 +228,7 @@ python train_classifier.py
 ### Using the classifier in inference
 
 ```python
-from train_classifier import CropClassifier
+from src.classifier.train_classifier import CropClassifier
 
 clf = CropClassifier()                # loads outputs/classifier_output/best.pth
 crop, conf, yolo_ids = clf.predict("leaf.jpg")
@@ -262,7 +272,7 @@ Disease bounding boxes + labels
 ### Two-stage usage example (YOLO)
 
 ```python
-from train_classifier import CropClassifier
+from src.classifier.train_classifier import CropClassifier
 from ultralytics import YOLO
 
 clf  = CropClassifier()

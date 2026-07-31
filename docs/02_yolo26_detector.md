@@ -1,6 +1,6 @@
 # YOLO26 Crop Disease Detector
 
-**Script:** `train.py`  
+**Script:** `src/yolo/train.py`  
 **Output directory:** `yolo_output/` (figures) · `runs/crop_disease_yolo26/` (weights)  
 **Role:** Primary one-stage detection baseline
 
@@ -179,7 +179,7 @@ for box in results[0].boxes:
 For the two-stage pipeline, use the `CropClassifier` to gate detection first:
 
 ```python
-from train_classifier import CropClassifier
+from src.classifier.train_classifier import CropClassifier
 from ultralytics import YOLO
 
 clf  = CropClassifier()

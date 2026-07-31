@@ -1,6 +1,6 @@
 # Faster RCNN Ablation Study
 
-**Script:** `train_alt_fasterrcnn.py`  
+**Script:** `src/fasterrcnn/train_alt_fasterrcnn.py`  
 **Output directory:** `alt_fasterrcnn_output/`  
 **Role:** Systematic comparison of backbone depth, proposal count, NMS policy, and anchor scale to justify the final model architecture
 

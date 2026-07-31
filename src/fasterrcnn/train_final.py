@@ -99,41 +99,37 @@ import yaml
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Paths
+# Configuration Import
 # ══════════════════════════════════════════════════════════════════════════════
 
-PROJECT_ROOT  = Path(__file__).resolve().parent
-DATASET_DIR   = PROJECT_ROOT / "dataset"
-NEG_DIR       = PROJECT_ROOT / "data" / "negatives"
-OUTPUT_DIR    = PROJECT_ROOT / "outputs" / "final_output"
+from src.fasterrcnn.config import (
+    PROJECT_ROOT,
+    DATASET_DIR,
+    NEG_DIR,
+    OUTPUT_DIR_FINAL as OUTPUT_DIR,
+    TRAIN_CSV,
+    VAL_CSV,
+    TRAIN_IMG_DIR,
+    VAL_IMG_DIR,
+    NUM_CLASSES,
+    IMG_SIZE,
+    BATCH_SIZE,
+    ACCUM_STEPS,
+    LR0,
+    WEIGHT_DECAY,
+    MOMENTUM,
+    WARMUP_EPOCHS,
+    FREEZE_BACKBONE_EPOCHS,
+    GRAD_CLIP,
+    CLASS_NAMES,
+)
+
 CKPT_DIR      = OUTPUT_DIR / "checkpoints"
 MODELS_DIR    = OUTPUT_DIR / "models"
 METRICS_FILE  = OUTPUT_DIR / "metrics_history.json"
 
-TRAIN_CSV     = DATASET_DIR / "final_train_labels.csv"
-VAL_CSV       = DATASET_DIR / "final_validate_labels.csv"
-TRAIN_IMG_DIR = DATASET_DIR / "train"
-VAL_IMG_DIR   = DATASET_DIR / "validate"
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Constants
-# ══════════════════════════════════════════════════════════════════════════════
-
-NUM_CLASSES    = 24        # 23 disease classes (1–23) + background (0)
-IMG_SIZE       = 640
-
-# Training
 EPOCHS_DEFAULT        = 50
 PATIENCE              = 10
-BATCH_SIZE            = 4
-ACCUM_STEPS           = 2    # effective batch = 4 × 2 = 8
-LR0                   = 5e-3
-WEIGHT_DECAY          = 5e-4
-MOMENTUM              = 0.9
-WARMUP_EPOCHS         = 3
-FREEZE_BACKBONE_EPOCHS= 5
-GRAD_CLIP             = 10.0
 EVAL_EVERY            = 3
 SGDR_T0               = 12   # first SGDR cycle length (post-warmup epochs)
 SGDR_T_MULT           = 2    # each restart doubles cycle length

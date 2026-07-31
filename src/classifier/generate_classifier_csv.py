@@ -164,7 +164,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    project_root = Path(__file__).resolve().parent
+    project_root = Path(__file__).resolve().parent.parent.parent
     data_dir     = project_root / args.data_dir
     out_dir      = project_root / args.out_dir
 

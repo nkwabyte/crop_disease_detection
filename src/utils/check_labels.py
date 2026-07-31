@@ -1,7 +1,8 @@
 import pandas as pd
 from pathlib import Path
 
-DATA_DIR = Path("data/main")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+DATA_DIR = PROJECT_ROOT / "data" / "main"
 for split in ["train", "valid", "test"]:
     ldir = DATA_DIR / split / "labels"
     if not ldir.exists(): continue

@@ -68,74 +68,40 @@ from torchvision.transforms import v2
 # ══════════════════════════════════════════════════════════════════════════════
 # Constants
 # ══════════════════════════════════════════════════════════════════════════════
+# Configuration Import
+# ══════════════════════════════════════════════════════════════════════════════
 
-PROJECT_ROOT = Path(__file__).resolve().parent
-DATASET_DIR  = PROJECT_ROOT / "dataset"
-NEG_DIR      = PROJECT_ROOT / "data" / "negatives"
-OUTPUT_DIR   = PROJECT_ROOT / "outputs" / "fasterrcnn_output"
+from src.fasterrcnn.config import (
+    PROJECT_ROOT,
+    DATASET_DIR,
+    NEG_DIR,
+    OUTPUT_DIR_BASELINE as OUTPUT_DIR,
+    TRAIN_CSV,
+    VAL_CSV,
+    TEST_CSV,
+    TRAIN_IMG_DIR,
+    VAL_IMG_DIR,
+    TEST_IMG_DIR,
+    NUM_CLASSES,
+    IMG_SIZE,
+    EPOCHS_DEFAULT,
+    PATIENCE_DEFAULT as PATIENCE,
+    BATCH_SIZE,
+    LR0,
+    WEIGHT_DECAY,
+    MOMENTUM,
+    WARMUP_EPOCHS,
+    FREEZE_BACKBONE_EPOCHS,
+    GRAD_CLIP,
+    EVAL_EVERY,
+    NUM_NEGATIVES,
+    CLASS_NAMES,
+)
+
 CKPT_DIR     = OUTPUT_DIR / "checkpoints"
 MODELS_DIR   = OUTPUT_DIR / "models"
 METRICS_FILE = OUTPUT_DIR / "metrics_history.json"
-
-TRAIN_CSV = DATASET_DIR / "final_train_labels.csv"
-VAL_CSV   = DATASET_DIR / "final_validate_labels.csv"
-TEST_CSV  = DATASET_DIR / "final_test_labels.csv"
-
-TRAIN_IMG_DIR = DATASET_DIR / "train"
-VAL_IMG_DIR   = DATASET_DIR / "validate"
-TEST_IMG_DIR  = DATASET_DIR / "test"
-
-# ── Model ─────────────────────────────────────────────────────────────────────
-# FasterRCNN labels: 0 = background (reserved), 1-23 = disease classes.
-# num_classes must include the background class → 23 + 1 = 24.
-NUM_CLASSES = 24
-IMG_SIZE    = 640
-
-# ── Training ──────────────────────────────────────────────────────────────────
-EPOCHS_DEFAULT        = 30
-PATIENCE              = 8
-BATCH_SIZE            = 4    # safe on 24 GB unified memory; Faster RCNN is heavy
-LR0                   = 5e-3
-WEIGHT_DECAY          = 5e-4
-MOMENTUM              = 0.9
-WARMUP_EPOCHS         = 3
-FREEZE_BACKBONE_EPOCHS= 5    # lock backbone for first N epochs (same spirit as freeze=10 in YOLO)
-GRAD_CLIP             = 10.0
-EVAL_EVERY            = 5    # run val mAP every N epochs (expensive on 40k images)
-
-# ── Hard negatives ────────────────────────────────────────────────────────────
-NUM_NEGATIVES = 200   # ~0.5 % of 40 k train images — proportional to YOLO approach
-
-# ── Class map  (1-indexed, matching dataset/label_map.json exactly) ───────────
-# 0 = background (Faster RCNN convention, not a disease)
-CLASS_NAMES = [
-    "",                              # 0  background
-    "Corn Cercospora Leaf Spot",     # 1
-    "Corn Common Rust",              # 2
-    "Corn Healthy",                  # 3
-    "Corn Streak",                   # 4
-    "Corn Northern Leaf Blight",     # 5
-    "Pepper Leaf Curl",              # 6
-    "Pepper Cercospora",             # 7
-    "Pepper Leaf Blight",            # 8
-    "Pepper Bacterial Spot",         # 9
-    "Pepper Leaf Mosaic",            # 10
-    "Pepper Healthy",                # 11
-    "Pepper Fusarium",               # 12
-    "Pepper Septoria",               # 13
-    "Pepper Late Blight",            # 14
-    "Pepper Early Blight",           # 15
-    "Tomato Late Blight",            # 16
-    "Tomato Early Blight",           # 17
-    "Tomato Bacterial Spot",         # 18
-    "Tomato Septoria",               # 19
-    "Tomato Fusarium",               # 20
-    "Tomato Leaf Curl",              # 21
-    "Tomato Healthy",                # 22
-    "Tomato Mosaic",                 # 23
-]
-# Convenience list for plot labels (0-indexed display, skips background)
-CLASS_NAMES_DISPLAY = CLASS_NAMES[1:]   # len == 23
+CLASS_NAMES_DISPLAY = CLASS_NAMES[1:]
 
 
 # ══════════════════════════════════════════════════════════════════════════════

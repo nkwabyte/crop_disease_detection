@@ -1,6 +1,6 @@
 # Two-Stage Inference Pipeline
 
-**Components:** `train_classifier.py` (Stage 1) + any detector (Stage 2)  
+**Components:** `src/classifier/train_classifier.py` (Stage 1) + any detector (Stage 2)  
 **Purpose:** Prevent cross-crop false positives before disease detection
 
 ---
@@ -70,7 +70,7 @@ After the detector runs, bounding boxes whose class IDs are not in the allowed s
 ### With YOLO26
 
 ```python
-from train_classifier import CropClassifier
+from src.classifier.train_classifier import CropClassifier
 from ultralytics import YOLO
 
 clf  = CropClassifier()   # auto-loads classifier_output/best.pth
@@ -113,7 +113,7 @@ def detect_disease(image_path: str, conf_thresh: float = 0.50) -> dict:
 
 ```python
 import torch
-from train_classifier import CropClassifier
+from src.classifier.train_classifier import CropClassifier
 from torchvision.transforms import functional as F
 from PIL import Image
 
@@ -179,7 +179,7 @@ The classifier's `confidence_threshold` (default `0.55`) controls the trade-off 
 3. Choose the threshold at the gap between the two distributions.
 
 ```python
-from train_classifier import CropClassifier
+from src.classifier.train_classifier import CropClassifier
 from pathlib import Path
 
 clf = CropClassifier(confidence_threshold=0.0)  # disable threshold to see raw scores

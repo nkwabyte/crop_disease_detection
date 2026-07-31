@@ -36,8 +36,8 @@ filenames = {
     22: 'Septoria_lycopersici_on_tomato.jpg'
 }
 
-# The target output directory in the project
-drawable_dir = Path(__file__).resolve().parent / "app" / "src" / "commonMain" / "composeResources" / "drawable"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+drawable_dir = PROJECT_ROOT / "app" / "src" / "commonMain" / "composeResources" / "drawable"
 drawable_dir.mkdir(parents=True, exist_ok=True)
 
 headers = {'User-Agent': 'CropDiseaseDetectionMobile/1.0 (musahibrahimali@gmail.com) Mozilla/5.0'}

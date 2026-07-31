@@ -83,32 +83,26 @@ from torchvision.models import EfficientNet_B2_Weights, efficientnet_b2
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Constants
+# Configuration Import
 # ══════════════════════════════════════════════════════════════════════════════
 
-PROJECT_ROOT  = Path(__file__).resolve().parent
-DATASET_DIR   = PROJECT_ROOT / "dataset"
-OUTPUT_DIR    = PROJECT_ROOT / "outputs" / "classifier_output"
-FIGURES_DIR   = OUTPUT_DIR / "figures"
-
-CROP_CLASSES  = ["Corn", "Pepper", "Tomato"]
-NUM_CLASSES   = len(CROP_CLASSES)       # 3
-
-IMG_SIZE      = 260                     # EfficientNet-B2 native resolution
-EPOCHS_DEFAULT = 40
-BATCH_DEFAULT  = 64                     # M4 Pro 24 GB handles batch-64 with headroom
-LR_DEFAULT     = 1e-4
-WEIGHT_DECAY   = 1e-4
-PATIENCE       = 8                      # early-stopping patience (epochs)
-CONF_DEFAULT   = 0.55                   # min softmax confidence to accept a crop
-GRAD_CLIP      = 1.0                    # max gradient norm for training stability
-
-# Corn classes 0–4, Pepper 5–14, Tomato 15–22 (for pipeline integration)
-CROP_TO_YOLO_CLASSES: dict[str, list[int]] = {
-    "Corn":   list(range(0, 5)),
-    "Pepper": list(range(5, 15)),
-    "Tomato": list(range(15, 23)),
-}
+from src.classifier.config import (
+    PROJECT_ROOT,
+    DATASET_DIR,
+    OUTPUT_DIR,
+    FIGURES_DIR,
+    CROP_CLASSES,
+    NUM_CLASSES,
+    IMG_SIZE,
+    EPOCHS_DEFAULT,
+    BATCH_DEFAULT,
+    LR_DEFAULT,
+    WEIGHT_DECAY,
+    PATIENCE,
+    CONF_DEFAULT,
+    GRAD_CLIP,
+    CROP_TO_YOLO_CLASSES,
+)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
