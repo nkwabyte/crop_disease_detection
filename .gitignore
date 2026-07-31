@@ -1,5 +1,5 @@
 # =============================================================================
-# Python
+# Python & Virtual Environments
 # =============================================================================
 __pycache__/
 *.py[cod]
@@ -13,9 +13,6 @@ build/
 .Python
 pip-wheel-metadata/
 
-# =============================================================================
-# Virtual environments
-# =============================================================================
 .venv/
 venv/
 env/
@@ -24,24 +21,11 @@ ENV/
 .env.*
 
 # =============================================================================
-# Jupyter
+# Jupyter & IDEs
 # =============================================================================
 .ipynb_checkpoints/
 **/.ipynb_checkpoints/
 
-MUSAH REQUEST FOR COMPUTE.docx
-
-# =============================================================================
-# macOS
-# =============================================================================
-.DS_Store
-.AppleDouble
-.LSOverride
-._*
-
-# =============================================================================
-# IDEs
-# =============================================================================
 .idea/
 .vscode/
 *.swp
@@ -49,8 +33,25 @@ MUSAH REQUEST FOR COMPUTE.docx
 *~
 
 # =============================================================================
-# Dataset images — too large for GitHub (download from Roboflow)
-# See docs/07_dataset.md for download instructions.
+# macOS / System
+# =============================================================================
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+
+# =============================================================================
+# Large Documents & Office Spreadsheets
+# =============================================================================
+*.xlsx
+*.xls
+*.docx
+*.pptx
+
+# =============================================================================
+# Datasets & Auto-Generated CSVs
+# See docs/07_dataset.md for dataset download instructions
 # =============================================================================
 data/main/train/
 data/main/valid/
@@ -60,23 +61,32 @@ data/negatives/
 dataset/train/
 dataset/validate/
 dataset/test/
+dataset/classifier_*.csv
+
+# Auto-generated config (written by train.py at startup)
+data_fixed.yaml
 
 # =============================================================================
-# Training outputs — auto-created by training scripts
-# =============================================================================
-outputs/
-runs/
-
-# =============================================================================
-# Downloaded / pretrained model weights
+# Model Weights & Exported Artifacts (Pretrained, Checkpoints & ExecuTorch/ONNX)
 # =============================================================================
 *.pt
 *.pth
 *.onnx
 *.ptl
 *.pte
+*.tflite
+*.engine
+*.bin
+*.safetensors
+yolo*.pt
+models/*
+!models/.gitkeep
+!models/README.md
 
 # =============================================================================
-# Auto-generated config (written by train.py at startup)
+# Training Outputs, Runs & Logs
 # =============================================================================
-data_fixed.yaml
+outputs/
+runs/
+logs/
+*.log

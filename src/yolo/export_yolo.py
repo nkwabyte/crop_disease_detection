@@ -5,10 +5,7 @@ from datetime import datetime
 import torch
 from ultralytics import YOLO
 
-# ─── Configuration ─────────────────────────────────────────────────────────────
-PROJECT_ROOT = Path.cwd()
-RUNS_DIR     = PROJECT_ROOT / "runs"
-EXP_NAME     = "crop_disease_yolo26"
+from src.yolo.config import PROJECT_ROOT, RUNS_DIR, EXP_NAME
 
 MODELS_DIR   = PROJECT_ROOT / "models"
 MODELS_DIR.mkdir(exist_ok=True)

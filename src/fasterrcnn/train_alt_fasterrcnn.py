@@ -93,38 +93,36 @@ import pandas as pd
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Paths & directory structure
+# Configuration Import
 # ══════════════════════════════════════════════════════════════════════════════
 
-PROJECT_ROOT = Path(__file__).resolve().parent
-DATASET_DIR  = PROJECT_ROOT / "dataset"
-NEG_DIR      = PROJECT_ROOT / "data" / "negatives"   # shared with train_fasterrcnn.py
-OUT_DIR      = PROJECT_ROOT / "outputs" / "alt_fasterrcnn_output"
+from src.fasterrcnn.config import (
+    PROJECT_ROOT,
+    DATASET_DIR,
+    NEG_DIR,
+    OUTPUT_DIR_ALT as OUT_DIR,
+    TRAIN_CSV,
+    VAL_CSV,
+    TRAIN_IMG_DIR,
+    VAL_IMG_DIR,
+    NUM_CLASSES,
+    IMG_SIZE,
+    BATCH_SIZE,
+    LR0,
+    WEIGHT_DECAY,
+    MOMENTUM,
+    GRAD_CLIP,
+    CLASS_NAMES,
+)
+
 CKPT_ROOT    = OUT_DIR / "checkpoints"
 MODELS_DIR   = OUT_DIR / "models"
 FIGS_DIR     = OUT_DIR / "figures"
 RESULTS_PATH = OUT_DIR / "results.json"
 
-TRAIN_CSV     = DATASET_DIR / "final_train_labels.csv"
-VAL_CSV       = DATASET_DIR / "final_validate_labels.csv"
-TRAIN_IMG_DIR = DATASET_DIR / "train"
-VAL_IMG_DIR   = DATASET_DIR / "validate"
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Constants
-# ══════════════════════════════════════════════════════════════════════════════
-
-NUM_CLASSES    = 24       # 23 disease classes + background (label 0)
-IMG_SIZE       = 640
 EPOCHS_DEFAULT = 15       # shorter than main pipeline; ablation is comparative
 PATIENCE       = 5
-BATCH_SIZE     = 4
-LR0            = 5e-3
-WEIGHT_DECAY   = 5e-4
-MOMENTUM       = 0.9
 WARMUP_EPOCHS  = 2
-GRAD_CLIP      = 10.0
 EVAL_EVERY     = 3        # evaluate mAP every N epochs
 NUM_NEGATIVES  = 100      # hard-negative images
 BENCH_RUNS     = 100      # iterations per speed benchmark

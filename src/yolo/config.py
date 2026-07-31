@@ -10,9 +10,11 @@ FIXED_YAML   = PROJECT_ROOT / "data_fixed.yaml"
 RUNS_DIR     = PROJECT_ROOT / "runs"
 OUTPUT_DIR   = PROJECT_ROOT / "outputs" / "yolo_output"
 EXP_NAME     = "crop_disease_yolo26"
+MODELS_DIR   = PROJECT_ROOT / "models"
+MODELS_DIR.mkdir(exist_ok=True)
 
 # ── Model & Hyperparameters ───────────────────────────────────────────────────
-MODEL_SIZE     = "yolo26n"   # switch to yolo26s/m/l/x if val mAP plateaus
+MODEL_SIZE     = MODELS_DIR / "yolo26n.pt"   # pretrained weights saved in models/
 IMG_SIZE       = 640
 BASE_BATCH     = 32          # per-GPU; 32 × yolo26n fits comfortably in 24 GB
 EPOCHS_DEFAULT = 200

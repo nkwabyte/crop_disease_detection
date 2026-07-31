@@ -1,6 +1,6 @@
 # Crop-Type Leaf Classifier — EfficientNet-B2
 
-**Script:** `train_classifier.py`  
+**Script:** `src/classifier/train_classifier.py`  
 **Output directory:** `classifier_output/`  
 **Role:** Stage 1 of the two-stage inference pipeline
 
@@ -179,10 +179,10 @@ Weights are always saved as CPU tensors so checkpoints load cleanly on any devic
 
 ## 8. Inference Integration
 
-The `CropClassifier` class at the bottom of `train_classifier.py` is importable directly:
+The `CropClassifier` class at the bottom of `src/classifier/train_classifier.py` is importable directly:
 
 ```python
-from train_classifier import CropClassifier
+from src.classifier.train_classifier import CropClassifier
 
 clf = CropClassifier()                          # auto-loads classifier_output/best.pth
 crop, confidence, yolo_ids = clf.predict("leaf.jpg")
@@ -196,7 +196,7 @@ crop, confidence, yolo_ids = clf.predict("leaf.jpg")
 Use in a two-stage detection pipeline:
 
 ```python
-from train_classifier import CropClassifier
+from src.classifier.train_classifier import CropClassifier
 from ultralytics import YOLO
 
 clf  = CropClassifier(confidence_threshold=0.55)

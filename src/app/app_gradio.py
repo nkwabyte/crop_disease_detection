@@ -27,12 +27,12 @@ import torch
 from PIL import Image, ImageDraw, ImageFont
 from ultralytics import YOLO
 
-PROJECT_ROOT = Path(__file__).parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 # Import the classifier — gracefully degrade if train_classifier is unavailable
 try:
-    from train_classifier import CropClassifier
+    from src.classifier.train_classifier import CropClassifier
     _CLF_AVAILABLE = True
 except Exception:
     _CLF_AVAILABLE = False
