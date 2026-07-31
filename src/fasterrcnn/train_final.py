@@ -1002,6 +1002,34 @@ def _save_metrics(history: dict) -> None:
         json.dump(history, f, indent=2)
 
 
+def write_final_eval(result: dict, model, split: str = "valid") -> None:
+    """Persist final per-class AP + mAP as JSON for the cross-model benchmark aggregator.
+
+    Writes outputs/final_output/final_eval.json and a copy into outputs/benchmarks/.
+    Fully guarded by the caller — never breaks training.
+    """
+    import math as _math
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    per_class = {CLASS_NAMES[c]: (None if _math.isnan(v) else round(float(v), 5))
+                 for c, v in result["per_class_ap"].items()}
+    payload = {
+        "model_name": "sefpn_fasterrcnn",
+        "architecture": "SE-FPN Faster RCNN ResNet-50-FPN-v2 (final)",
+        "split": split,
+        "map50": round(float(result["map50"]), 5),
+        "num_params": sum(p.numel() for p in model.parameters()),
+        "per_class_ap": per_class,
+        "evaluated_at": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+    }
+    with open(OUTPUT_DIR / "final_eval.json", "w") as f:
+        json.dump(payload, f, indent=2)
+    bench_dir = PROJECT_ROOT / "outputs" / "benchmarks"
+    bench_dir.mkdir(parents=True, exist_ok=True)
+    with open(bench_dir / "sefpn_fasterrcnn.json", "w") as f:
+        json.dump(payload, f, indent=2)
+    print(f"  Final eval saved → {OUTPUT_DIR / 'final_eval.json'}")
+
+
 def _load_metrics() -> dict:
     if METRICS_FILE.exists():
         with open(METRICS_FILE) as f:
@@ -1970,6 +1998,12 @@ def main():
         pr_data      = final_eval["pr_data"]
         confusion_mat = final_eval["confusion"]
         print(f"  Final mAP@0.5 = {final_eval['map50']:.4f}")
+
+        # Persist per-class AP for the cross-model benchmark (guarded — never breaks training)
+        try:
+            write_final_eval(final_eval, model, split="valid")
+        except Exception as _exc:
+            print(f"  ⚠  benchmark summary skipped: {_exc}")
 
         bench = benchmark_fps(model, device)
         print(f"  Benchmark: {bench['fps']:.1f} FPS  full={bench['full_ms']:.1f}ms  "

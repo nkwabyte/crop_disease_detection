@@ -607,6 +607,33 @@ def _save_metrics(history: dict) -> None:
         json.dump(history, f, indent=2)
 
 
+def write_final_eval(result: dict, model: nn.Module, split: str = "valid") -> None:
+    """Persist final per-class AP + mAP as JSON for the cross-model benchmark aggregator.
+
+    Writes outputs/fasterrcnn_output/final_eval.json and a copy into the shared
+    outputs/benchmarks/ folder. Fully guarded by the caller — never breaks training.
+    """
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    per_class = {CLASS_NAMES[c]: (None if math.isnan(v) else round(float(v), 5))
+                 for c, v in result["per_class_ap"].items()}
+    payload = {
+        "model_name": "fasterrcnn_resnet50_fpn_v2",
+        "architecture": "Faster RCNN ResNet-50-FPN-v2",
+        "split": split,
+        "map50": round(float(result["map50"]), 5),
+        "num_params": sum(p.numel() for p in model.parameters()),
+        "per_class_ap": per_class,
+        "evaluated_at": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+    }
+    with open(OUTPUT_DIR / "final_eval.json", "w") as f:
+        json.dump(payload, f, indent=2)
+    bench_dir = PROJECT_ROOT / "outputs" / "benchmarks"
+    bench_dir.mkdir(parents=True, exist_ok=True)
+    with open(bench_dir / "fasterrcnn_resnet50_fpn_v2.json", "w") as f:
+        json.dump(payload, f, indent=2)
+    print(f"  Final eval saved → {OUTPUT_DIR / 'final_eval.json'}")
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Step 3 — Publication figures
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1573,6 +1600,12 @@ Examples:
     print("\n  Running final evaluation for per-class AP …")
     final_result = evaluate(model, val_loader, device)
     print(f"  Final val mAP@0.5 = {final_result['map50']:.4f}")
+
+    # Persist per-class AP for the cross-model benchmark (guarded — never breaks training)
+    try:
+        write_final_eval(final_result, model, split="valid")
+    except Exception as _exc:
+        print(f"  ⚠  benchmark summary skipped: {_exc}")
 
     # ── Step 3: Publication figures ───────────────────────────────────────────
     if not args.no_figures:
