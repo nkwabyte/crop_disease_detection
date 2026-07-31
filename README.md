@@ -487,7 +487,7 @@ across backbone depth, RPN proposal count, NMS policy, and anchor scale.
 | --- | --------- | -------- | --------- | ---------- | ------------ | ---- |
 | 1 | `mobilenet_300` | MobileNetV3-FPN (~19M params) | 300 | 0.7 | default | Lightweight baseline |
 | 2 | `resnet50_100` | ResNet50-FPN-v2 (~43M params) | 100 | 0.7 | default | Low-proposal ablation |
-| 3 | `resnet50_300` | ResNet50-FPN-v2 (~43M params) | 300 | 0.7 | default | **Selected model ★** |
+| 3 | `resnet50_300` | ResNet50-FPN-v2 (~43M params) | 300 | 0.7 | default | **Selected model (*)** |
 | 4 | `resnet50_1000` | ResNet50-FPN-v2 (~43M params) | 1000 | 0.7 | default | High-proposal ablation |
 | 5 | `resnet50_no_nms` | ResNet50-FPN-v2 (~43M params) | 300 | 1.0 | default | NMS disabled |
 | 6 | `resnet50_small_anchors` | ResNet50-FPN-v2 (~43M params) | 300 | 0.7 | 16–256 px | Disease-lesion optimised |
@@ -1005,6 +1005,34 @@ Outputs (to `outputs/benchmarks/`):
 | `fig_map_comparison.png` | mAP@0.5 bar chart across detection models |
 | `fig_params_vs_map.png` | Model size vs accuracy scatter |
 | `fig_per_class_heatmap.png` | Per-class AP@0.5 heatmap (models × 23 classes) |
+
+### Quantization (INT8 → ExecuTorch) and latency
+
+Two deployment-cost tools live alongside the accuracy aggregator:
+
+```bash
+python -m src.benchmark.quantize    # PT2E static INT8 → XNNPACK .pte (~4× smaller)
+python -m src.benchmark.latency     # size + CPU latency of every exported .pte / .onnx
+```
+
+`quantize.py` produces INT8 `.pte` files next to their fp32 counterparts and
+**fidelity-checks each one** against the fp32 source, warning loudly if quantization
+degraded it. Requires `flatc` on `PATH` (`brew install flatbuffers`, or the copy at
+`.venv/bin/flatc`).
+
+Findings so far (measured on the M4 Pro):
+
+- Static PTQ preserves accuracy on **CNN backbones** (ResNet family — 100% top-1
+  agreement, ~3.8× smaller) — the right path for the Faster RCNN / Swin backbones.
+- It **collapses EfficientNet-B2** (the Stage-1 classifier): SiLU + squeeze-excite are
+  PTQ-fragile, so top-1 agreement drops to ~0.13. The classifier needs **QAT** (or ship
+  it fp32). The tool detects and reports this rather than shipping a broken model.
+- **Size** shrinks ~4× across the board; on Apple Silicon **latency is roughly flat**
+  (fp32 NEON is already fast) — the CPU speed-up from INT8 shows on mid-range Android.
+
+`latency.py` writes `outputs/benchmarks/{latency.json, latency_table.md, fig_latency.png}`.
+Host-CPU numbers indicate the mobile-CPU ordering; for exact device timings, profile the
+`.pte` on the target phone.
 
 See [`docs/08_next_steps.md`](docs/08_next_steps.md) for recommended additional models
 and experiments to strengthen the benchmark for publication.
