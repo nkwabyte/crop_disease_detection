@@ -156,7 +156,7 @@ def prepare_hard_negatives(num: int = NUM_NEGATIVES, skip: bool = False) -> list
             for done, future in enumerate(as_completed(futures), 1):
                 seed, exc = future.result()
                 if exc:
-                    print(f"    ⚠  seed {seed}: {exc}")
+                    print(f"    [WARN]  seed {seed}: {exc}")
                     err += 1
                 else:
                     ok += 1
@@ -166,7 +166,7 @@ def prepare_hard_negatives(num: int = NUM_NEGATIVES, skip: bool = False) -> list
 
     all_negs = sorted(neg_img_dir.glob("*.jpg"))[:num]
     print(f"  Hard negatives ready: {len(all_negs)} images  ({neg_img_dir})")
-    print("  ✅  Hard-negative setup complete")
+    print("  [OK]  Hard-negative setup complete")
     return all_negs
 
 
@@ -607,6 +607,33 @@ def _save_metrics(history: dict) -> None:
         json.dump(history, f, indent=2)
 
 
+def write_final_eval(result: dict, model: nn.Module, split: str = "valid") -> None:
+    """Persist final per-class AP + mAP as JSON for the cross-model benchmark aggregator.
+
+    Writes outputs/fasterrcnn_output/final_eval.json and a copy into the shared
+    outputs/benchmarks/ folder. Fully guarded by the caller — never breaks training.
+    """
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    per_class = {CLASS_NAMES[c]: (None if math.isnan(v) else round(float(v), 5))
+                 for c, v in result["per_class_ap"].items()}
+    payload = {
+        "model_name": "fasterrcnn_resnet50_fpn_v2",
+        "architecture": "Faster RCNN ResNet-50-FPN-v2",
+        "split": split,
+        "map50": round(float(result["map50"]), 5),
+        "num_params": sum(p.numel() for p in model.parameters()),
+        "per_class_ap": per_class,
+        "evaluated_at": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+    }
+    with open(OUTPUT_DIR / "final_eval.json", "w") as f:
+        json.dump(payload, f, indent=2)
+    bench_dir = PROJECT_ROOT / "outputs" / "benchmarks"
+    bench_dir.mkdir(parents=True, exist_ok=True)
+    with open(bench_dir / "fasterrcnn_resnet50_fpn_v2.json", "w") as f:
+        json.dump(payload, f, indent=2)
+    print(f"  Final eval saved → {OUTPUT_DIR / 'final_eval.json'}")
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Step 3 — Publication figures
 # ══════════════════════════════════════════════════════════════════════════════
@@ -642,7 +669,7 @@ def generate_figures(per_class_ap: Optional[dict] = None) -> None:
         import matplotlib.patches as mpatches
         import matplotlib.gridspec as gridspec
     except ImportError as exc:
-        print(f"  ⚠  Figure generation skipped (missing: {exc})")
+        print(f"  [WARN]  Figure generation skipped (missing: {exc})")
         return
 
     OUTPUT_DIR.mkdir(exist_ok=True)
@@ -739,7 +766,7 @@ def generate_figures(per_class_ap: Optional[dict] = None) -> None:
     plt.tight_layout()
     out = OUTPUT_DIR / "fig_01_dataset_overview.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_01  dataset overview")
+    print("  [OK]  fig_01  dataset overview")
 
     # ── Fig 02: Per-Class Annotation Count (Training) ────────────────────────
     tc  = dfs["train"]
@@ -761,7 +788,7 @@ def generate_figures(per_class_ap: Optional[dict] = None) -> None:
         ax.axhline(y=b, color="#7F8C8D", lw=0.9, linestyle="--", alpha=0.7)
     for i, (nm, cnt) in enumerate(zip(CLASS_NAMES_DISPLAY, cc.values)):
         if cnt < 30:
-            ax.text(cnt + 50, i, "  ⚠ < 30", va="center",
+            ax.text(cnt + 50, i, "  [WARN] < 30", va="center",
                     color="#E74C3C", fontsize=8.5, fontstyle="italic")
     patches = [
         mpatches.Patch(color=CROP_PAL["Corn"],   label="Corn (classes 1–5)"),
@@ -773,7 +800,7 @@ def generate_figures(per_class_ap: Optional[dict] = None) -> None:
     plt.tight_layout()
     out = OUTPUT_DIR / "fig_02_class_distribution_train.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_02  class distribution (train)")
+    print("  [OK]  fig_02  class distribution (train)")
 
     # ── Fig 03: Cross-Split Distribution ─────────────────────────────────────
     cnt_abs = {
@@ -805,7 +832,7 @@ def generate_figures(per_class_ap: Optional[dict] = None) -> None:
     plt.tight_layout()
     out = OUTPUT_DIR / "fig_03_cross_split_distribution.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_03  cross-split distribution")
+    print("  [OK]  fig_03  cross-split distribution")
 
     # ── Fig 04: Annotation Density (boxes per image) ──────────────────────────
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
@@ -825,7 +852,7 @@ def generate_figures(per_class_ap: Optional[dict] = None) -> None:
     plt.tight_layout()
     out = OUTPUT_DIR / "fig_04_annotation_density.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_04  annotation density")
+    print("  [OK]  fig_04  annotation density")
 
     # ── Fig 05: Bounding Box Spatial Heatmap ──────────────────────────────────
     tb = dfs["train"]
@@ -850,7 +877,7 @@ def generate_figures(per_class_ap: Optional[dict] = None) -> None:
     plt.tight_layout()
     out = OUTPUT_DIR / "fig_05_bbox_spatial_heatmap.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_05  bounding-box spatial heatmap")
+    print("  [OK]  fig_05  bounding-box spatial heatmap")
 
     # ── Fig 06: Bounding Box Geometry ────────────────────────────────────────
     tb2 = dfs["train"].copy()
@@ -902,7 +929,7 @@ def generate_figures(per_class_ap: Optional[dict] = None) -> None:
 
     out = OUTPUT_DIR / "fig_06_bbox_geometry.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_06  bounding-box geometry")
+    print("  [OK]  fig_06  bounding-box geometry")
 
     # ── Fig 07: Class Imbalance ───────────────────────────────────────────────
     cnt_r = {}
@@ -932,7 +959,7 @@ def generate_figures(per_class_ap: Optional[dict] = None) -> None:
     plt.tight_layout()
     out = OUTPUT_DIR / "fig_07_class_imbalance.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_07  class imbalance")
+    print("  [OK]  fig_07  class imbalance")
 
     # ── Fig 08: Training Configuration Table ─────────────────────────────────
     ni_tr = n_imgs["train"] + NUM_NEGATIVES
@@ -982,7 +1009,7 @@ def generate_figures(per_class_ap: Optional[dict] = None) -> None:
     plt.tight_layout()
     out = OUTPUT_DIR / "fig_08_training_config.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_08  training config table")
+    print("  [OK]  fig_08  training config table")
 
     # ── Fig 09: LR Schedule + Augmentation Profile ───────────────────────────
     ep_arr = np.arange(1, EPOCHS_DEFAULT + 1)
@@ -1043,7 +1070,7 @@ def generate_figures(per_class_ap: Optional[dict] = None) -> None:
     plt.tight_layout()
     out = OUTPUT_DIR / "fig_09_lr_schedule_augmentation.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_09  LR schedule + augmentation")
+    print("  [OK]  fig_09  LR schedule + augmentation")
 
     # ── Fig 10: Training Metrics (post-training only) ─────────────────────────
     if METRICS_FILE.exists():
@@ -1072,7 +1099,7 @@ def generate_figures(per_class_ap: Optional[dict] = None) -> None:
             plt.tight_layout()
             out = OUTPUT_DIR / "fig_10_training_metrics.png"
             plt.savefig(out); plt.close(); saved.append(out)
-            print("  ✓  fig_10  training metrics")
+            print("  [OK]  fig_10  training metrics")
         else:
             print("  –  fig_10 skipped (no training history found)")
     else:
@@ -1112,7 +1139,7 @@ def generate_figures(per_class_ap: Optional[dict] = None) -> None:
         plt.tight_layout()
         out = OUTPUT_DIR / "fig_11_per_class_ap.png"
         plt.savefig(out); plt.close(); saved.append(out)
-        print("  ✓  fig_11  per-class AP")
+        print("  [OK]  fig_11  per-class AP")
     else:
         print("  –  fig_11 skipped (run after training)")
 
@@ -1155,17 +1182,17 @@ def export_model(model: nn.Module) -> None:
         optimized = optimize_for_mobile(scripted)
         ptl_path  = MODELS_DIR / "crop_disease_fasterrcnn.ptl"
         optimized._save_for_lite_interpreter(str(ptl_path))
-        print(f"         ✅ {ptl_path.name}  ({ptl_path.stat().st_size / 1e6:.1f} MB)")
+        print(f"         [OK] {ptl_path.name}  ({ptl_path.stat().st_size / 1e6:.1f} MB)")
     except Exception as e:
-        print(f"         ⚠  TorchScript mobile failed: {e}")
+        print(f"         [WARN]  TorchScript mobile failed: {e}")
         try:
             # Fall back to plain .pt if mobile_optimizer fails
             scripted = torch.jit.script(model)
             pt_path = MODELS_DIR / "crop_disease_fasterrcnn_jit.pt"
             scripted.save(str(pt_path))
-            print(f"         ✅ Saved plain TorchScript: {pt_path.name}")
+            print(f"         [OK] Saved plain TorchScript: {pt_path.name}")
         except Exception as e2:
-            print(f"         ✗  TorchScript also failed: {e2}")
+            print(f"         [FAIL]  TorchScript also failed: {e2}")
 
     # ── 2. ONNX export ────────────────────────────────────────────────────────
     print("  [2/4]  ONNX …")
@@ -1193,9 +1220,9 @@ def export_model(model: nn.Module) -> None:
                 "labels": {0: "n_det"},
             },
         )
-        print(f"         ✅ {onnx_path.name}  ({onnx_path.stat().st_size / 1e6:.1f} MB)")
+        print(f"         [OK] {onnx_path.name}  ({onnx_path.stat().st_size / 1e6:.1f} MB)")
     except Exception as e:
-        print(f"         ⚠  ONNX export failed: {e}")
+        print(f"         [WARN]  ONNX export failed: {e}")
 
     # ── 3. ExecuTorch export ──────────────────────────────────────────────────
     # Faster RCNN's NMS produces variable-length output which cannot be statically
@@ -1243,7 +1270,7 @@ def export_model(model: nn.Module) -> None:
         pte_path = MODELS_DIR / "crop_disease_fasterrcnn_backbone.pte"
         with open(pte_path, "wb") as f:
             f.write(et_prog.buffer)
-        print(f"         ✅ Backbone ExecuTorch: {pte_path.name}  "
+        print(f"         [OK] Backbone ExecuTorch: {pte_path.name}  "
               f"({pte_path.stat().st_size / 1e6:.1f} MB)")
         print("            Note: backbone-only export.  Pair with .ptl for full")
         print("            detection (RPN + ROI head) at runtime.")
@@ -1287,14 +1314,14 @@ def export_model(model: nn.Module) -> None:
             pte_full = MODELS_DIR / "crop_disease_fasterrcnn.pte"
             with open(pte_full, "wb") as f:
                 f.write(et_full.buffer)
-            print(f"         ✅ Full model ExecuTorch: {pte_full.name}  "
+            print(f"         [OK] Full model ExecuTorch: {pte_full.name}  "
                   f"({pte_full.stat().st_size / 1e6:.1f} MB)")
         except Exception as e_full:
-            print(f"         ℹ  Full ExecuTorch export skipped ({e_full})")
+            print(f"         [INFO]  Full ExecuTorch export skipped ({e_full})")
             print("            Use .ptl (TorchScript mobile) for full detection on device.")
 
     except Exception as e:
-        print(f"         ⚠  ExecuTorch failed: {e}")
+        print(f"         [WARN]  ExecuTorch failed: {e}")
         print("            Use crop_disease_fasterrcnn.ptl for mobile deployment.")
 
     # ── 4. Metadata YAML ──────────────────────────────────────────────────────
@@ -1329,7 +1356,7 @@ def export_model(model: nn.Module) -> None:
     meta_path = MODELS_DIR / "model_metadata.yaml"
     with open(meta_path, "w") as f:
         yaml.dump(metadata, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
-    print(f"         ✅ {meta_path.name}")
+    print(f"         [OK] {meta_path.name}")
 
     # ── Summary ───────────────────────────────────────────────────────────────
     print(f"\n  ── Exported artefacts in {MODELS_DIR} ───")
@@ -1386,7 +1413,7 @@ Examples:
         print("─── Export-only mode ────────────────────────────────────────────")
         best_pth = CKPT_DIR / "best.pth"
         if not best_pth.exists():
-            print(f"  ✗  No best checkpoint found at {best_pth}")
+            print(f"  [FAIL]  No best checkpoint found at {best_pth}")
             return
         model  = build_model()
         ckpt   = torch.load(best_pth, map_location="cpu", weights_only=False)
@@ -1479,7 +1506,7 @@ Examples:
                     state[k] = v.to(device)
         print(f"  Resumed at epoch {start_epoch}, best mAP@0.5 = {best_map:.4f}")
     elif last_pth.exists():
-        print(f"  ⚠  last.pth found but not resumable (weights-only?). Fresh run.")
+        print(f"  [WARN]  last.pth found but not resumable (weights-only?). Fresh run.")
 
     # Freeze backbone for the first FREEZE_BACKBONE_EPOCHS epochs
     initial_freeze = max(0, FREEZE_BACKBONE_EPOCHS - start_epoch)
@@ -1528,7 +1555,7 @@ Examples:
         if is_best:
             best_map  = val_map
             no_improve = 0
-            print(f"  ✨  New best mAP@0.5: {best_map:.4f}")
+            print(f"  [*]  New best mAP@0.5: {best_map:.4f}")
         elif not math.isnan(val_map):
             no_improve += 1
 
@@ -1558,7 +1585,7 @@ Examples:
             break
 
     total_time = time.perf_counter() - t0
-    print(f"\n✅  Training complete!  ({total_time / 3600:.1f} h total)")
+    print(f"\n[OK]  Training complete!  ({total_time / 3600:.1f} h total)")
     print(f"   Best mAP@0.5 : {best_map:.4f}")
     print(f"   Checkpoint   : {CKPT_DIR}/best.pth")
 
@@ -1573,6 +1600,12 @@ Examples:
     print("\n  Running final evaluation for per-class AP …")
     final_result = evaluate(model, val_loader, device)
     print(f"  Final val mAP@0.5 = {final_result['map50']:.4f}")
+
+    # Persist per-class AP for the cross-model benchmark (guarded — never breaks training)
+    try:
+        write_final_eval(final_result, model, split="valid")
+    except Exception as _exc:
+        print(f"  [WARN]  benchmark summary skipped: {_exc}")
 
     # ── Step 3: Publication figures ───────────────────────────────────────────
     if not args.no_figures:

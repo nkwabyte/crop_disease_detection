@@ -135,7 +135,7 @@ def prepare_hard_negatives(num: int = NUM_NEGATIVES, skip: bool = False) -> None
             for done, future in enumerate(as_completed(futures), 1):
                 seed, exc = future.result()
                 if exc:
-                    print(f"    ⚠  seed {seed}: {exc}")
+                    print(f"    [WARN]  seed {seed}: {exc}")
                     err += 1
                 else:
                     ok += 1
@@ -157,7 +157,7 @@ def prepare_hard_negatives(num: int = NUM_NEGATIVES, skip: bool = False) -> None
 
     staged_total = len(list(train_img_dir.glob("negative_*.jpg")))
     print(f"  Training split: {staged_total} negatives staged ({copied} newly added)")
-    print("  ✅  Hard-negative setup complete")
+    print("  [OK]  Hard-negative setup complete")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -311,7 +311,7 @@ def generate_figures(save_dir=None) -> None:
         import numpy as np
         import pandas as pd
     except ImportError as exc:
-        print(f"  ⚠  Figure generation skipped (missing dependency: {exc})")
+        print(f"  [WARN]  Figure generation skipped (missing dependency: {exc})")
         return
 
     OUTPUT_DIR.mkdir(exist_ok=True)
@@ -412,7 +412,7 @@ def generate_figures(save_dir=None) -> None:
     plt.tight_layout()
     out = OUTPUT_DIR / "fig_01_dataset_overview.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_01  dataset overview")
+    print("  [OK]  fig_01  dataset overview")
 
     # ── Fig 02: Per-Class Annotation Count (Training) ────────────────────────
     tc   = dfs["train"][dfs["train"].class_id >= 0]
@@ -434,7 +434,7 @@ def generate_figures(save_dir=None) -> None:
         ax.axhline(y=b, color="#7F8C8D", lw=0.9, linestyle="--", alpha=0.7)
     for i, (nm, cnt) in enumerate(zip(CLASS_NAMES, cc.values)):
         if cnt < 30:
-            ax.text(cnt + 35, i, "  ⚠ < 30", va="center",
+            ax.text(cnt + 35, i, "  [WARN] < 30", va="center",
                     color="#E74C3C", fontsize=8.5, fontstyle="italic")
     patches = [
         mpatches.Patch(color=CROP_PAL["Corn"],   label="Corn (classes 0–4)"),
@@ -446,7 +446,7 @@ def generate_figures(save_dir=None) -> None:
     plt.tight_layout()
     out = OUTPUT_DIR / "fig_02_class_distribution_train.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_02  class distribution (train)")
+    print("  [OK]  fig_02  class distribution (train)")
 
     # ── Fig 03: Cross-Split Distribution ─────────────────────────────────────
     cnt_abs = {
@@ -479,7 +479,7 @@ def generate_figures(save_dir=None) -> None:
     plt.tight_layout()
     out = OUTPUT_DIR / "fig_03_cross_split_distribution.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_03  cross-split distribution")
+    print("  [OK]  fig_03  cross-split distribution")
 
     # ── Fig 04: Annotation Density (boxes per image) ──────────────────────────
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
@@ -501,7 +501,7 @@ def generate_figures(save_dir=None) -> None:
     plt.tight_layout()
     out = OUTPUT_DIR / "fig_04_annotation_density.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_04  annotation density")
+    print("  [OK]  fig_04  annotation density")
 
     # ── Fig 05: Bounding Box Spatial Heatmap ──────────────────────────────────
     tb = df_box[df_box.split == "train"]
@@ -526,7 +526,7 @@ def generate_figures(save_dir=None) -> None:
     plt.tight_layout()
     out = OUTPUT_DIR / "fig_05_bbox_spatial_heatmap.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_05  bounding-box spatial heatmap")
+    print("  [OK]  fig_05  bounding-box spatial heatmap")
 
     # ── Fig 06: Bounding Box Geometry ────────────────────────────────────────
     tb2 = df_box[df_box.split == "train"].copy()
@@ -578,7 +578,7 @@ def generate_figures(save_dir=None) -> None:
 
     out = OUTPUT_DIR / "fig_06_bbox_size_analysis.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_06  bounding-box geometry")
+    print("  [OK]  fig_06  bounding-box geometry")
 
     # ── Fig 07: Class Imbalance ───────────────────────────────────────────────
     cnt_r = {}
@@ -612,7 +612,7 @@ def generate_figures(save_dir=None) -> None:
     plt.tight_layout()
     out = OUTPUT_DIR / "fig_07_class_imbalance.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_07  class imbalance")
+    print("  [OK]  fig_07  class imbalance")
 
     # ── Fig 08: Training Configuration Table ─────────────────────────────────
     ni_tr = n_imgs["train"]; ni_va = n_imgs["valid"]
@@ -662,7 +662,7 @@ def generate_figures(save_dir=None) -> None:
     plt.tight_layout()
     out = OUTPUT_DIR / "fig_08_training_config.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_08  training config table")
+    print("  [OK]  fig_08  training config table")
 
     # ── Fig 09: LR Schedule + Augmentation Profile ───────────────────────────
     ep_arr = np.arange(1, EPOCHS_DEFAULT + 1)
@@ -724,7 +724,7 @@ def generate_figures(save_dir=None) -> None:
     plt.tight_layout()
     out = OUTPUT_DIR / "fig_09_lr_schedule_augmentation.png"
     plt.savefig(out); plt.close(); saved.append(out)
-    print("  ✓  fig_09  LR schedule + augmentation")
+    print("  [OK]  fig_09  LR schedule + augmentation")
 
     # ── Fig 10: Training Metrics (post-training only) ─────────────────────────
     if save_dir is not None:
@@ -759,7 +759,7 @@ def generate_figures(save_dir=None) -> None:
                 plt.tight_layout()
                 out = OUTPUT_DIR / "fig_10_training_metrics.png"
                 plt.savefig(out); plt.close(); saved.append(out)
-                print("  ✓  fig_10  training metrics")
+                print("  [OK]  fig_10  training metrics")
             else:
                 print("  –  fig_10 skipped (no recognised metric columns in results.csv)")
         else:
@@ -852,7 +852,7 @@ Examples:
     resumable = last_pt.exists() and _is_resumable(last_pt)
 
     if not resumable and last_pt.exists():
-        print(f"  ⚠  last.pt found but has no training state (weights-only export).")
+        print(f"  [WARN]  last.pt found but has no training state (weights-only export).")
         print(f"     Starting a fresh training run with full hyperparameters.")
 
     if resumable:
@@ -863,7 +863,7 @@ Examples:
         results = model.train(resume=True)
     else:  # fresh training (no last.pt, or last.pt is weights-only)
         if dry_run:
-            print("  ⚡  DRY-RUN — 1-epoch validation + timing")
+            print("  [DRY-RUN]  DRY-RUN — 1-epoch validation + timing")
         model = YOLO(f"{MODEL_SIZE}.pt")
         log_startup(device, batch, n_train, n_val, MODEL_SIZE, epochs, dry_run, use_amp)
 
@@ -968,7 +968,7 @@ Examples:
         print("(Figures skipped in dry-run mode — omit --dry-run to generate them)")
         return
 
-    print(f"\n✅  Training complete!  ({elapsed / 3600:.1f} h total)")
+    print(f"\n[OK]  Training complete!  ({elapsed / 3600:.1f} h total)")
     print(f"   Best model: {results.save_dir}/weights/best.pt")
 
     # ── Step 4: Publication figures ───────────────────────────────────────────

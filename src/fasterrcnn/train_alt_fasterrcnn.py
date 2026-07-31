@@ -10,7 +10,7 @@ Configurations
 --------------
   1.  mobilenet_300          MobileNetV3-FPN,  300 proposals  (lightweight)
   2.  resnet50_100           ResNet50-FPN-v2,  100 proposals
-  3.  resnet50_300       ★   ResNet50-FPN-v2,  300 proposals  (selected baseline)
+  3.  resnet50_300       (*)   ResNet50-FPN-v2,  300 proposals  (selected baseline)
   4.  resnet50_1000          ResNet50-FPN-v2, 1000 proposals
   5.  resnet50_no_nms        ResNet50-FPN-v2,  300 proposals, NMS disabled
   6.  resnet50_small_anchors ResNet50-FPN-v2,  300 proposals, anchors 16-256 px
@@ -204,7 +204,7 @@ ABLATION_CONFIGS: List[AblationConfig] = [
         num_proposals=300,
         nms_thresh=0.7,
         anchor_sizes=None,
-        label="ResNet50v2 (baseline ★)",
+        label="ResNet50v2 (baseline (*))",
         color="#2ca02c",
         marker="*",
         is_baseline=True,
@@ -939,7 +939,7 @@ def generate_arch_figures() -> list:
     _save_fig(fig, "fig_arch_01_pipeline.png", saved)
 
     # ── fig_arch_02 : Backbone comparison ─────────────────────────────────────
-    backbones = ["MobileNetV3\n-Large FPN", "ResNet50\nFPN-v2 ★", "ResNet101\nFPN"]
+    backbones = ["MobileNetV3\n-Large FPN", "ResNet50\nFPN-v2 (*)", "ResNet101\nFPN"]
     params_m  = [19.04, 43.37, 60.35]    # millions
     depths    = [48, 50, 101]
     fpn_ch    = [256, 256, 256]
@@ -1154,7 +1154,7 @@ def generate_perf_figures(results: dict) -> list:
     for bar, v, baseline in zip(bars, maps, is_base):
         ax.text(bar.get_x() + bar.get_width() / 2,
                 bar.get_height() + 0.003,
-                f"{v:.3f}" + (" ★" if baseline else ""),
+                f"{v:.3f}" + (" (*)" if baseline else ""),
                 ha="center", va="bottom", fontsize=9,
                 fontweight="bold" if baseline else "normal")
     ax.set_xticks(x)
@@ -1179,7 +1179,7 @@ def generate_perf_figures(results: dict) -> list:
 
     ax.set_xlabel("Inference Speed (FPS, batch=1)")
     ax.set_ylabel("mAP@0.5")
-    ax.set_title("Speed vs Accuracy (★ = selected baseline)")
+    ax.set_title("Speed vs Accuracy ((*) = selected baseline)")
     _save_fig(fig, "fig_cmp_02_speed_accuracy.png", saved)
 
     # ── fig_cmp_03 : Loss convergence curves ──────────────────────────────────
@@ -1295,7 +1295,7 @@ def generate_perf_figures(results: dict) -> list:
 
     ax.set_xlabel("Parameters (M)")
     ax.set_ylabel("mAP@0.5")
-    ax.set_title("Parameters vs mAP@0.5 (★ = selected configuration)")
+    ax.set_title("Parameters vs mAP@0.5 ((*) = selected configuration)")
     _save_fig(fig, "fig_cmp_06_params_vs_map.png", saved)
 
     # ── fig_cmp_07 : Inference time breakdown ──────────────────────────────────
@@ -1397,7 +1397,7 @@ def generate_table_figures(results: dict) -> list:
             f"{r['n_params'] / 1e6:.1f}",
             f"{r['best_map50']:.4f}",
             f"{r['fps']:.1f}",
-            "★" if r["is_baseline"] else "",
+            "(*)" if r["is_baseline"] else "",
         ])
 
     fig, ax = plt.subplots(figsize=(20, len(rows) * 0.75 + 2))
@@ -1661,7 +1661,7 @@ def main():
     print("  " + "─" * 60)
     for cid in [c.config_id for c in ABLATION_CONFIGS if c.config_id in results]:
         r = results[cid]
-        star = " ★" if r["is_baseline"] else ""
+        star = " (*)" if r["is_baseline"] else ""
         print(f"  {cid:<30}  {r['best_map50']:>8.4f}  "
               f"{r['fps']:>7.1f}  {r['n_params']/1e6:>9.1f}M{star}")
     print("═" * 66)

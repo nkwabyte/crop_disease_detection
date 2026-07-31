@@ -20,7 +20,7 @@ def main():
     meta_path = models_dir / "classifier_metadata.yaml"
 
     if not best_pth.exists():
-        print(f"❌ Could not find classifier checkpoint at {best_pth}")
+        print(f"[ERROR] Could not find classifier checkpoint at {best_pth}")
         return
 
     print(f"Loading classifier from {best_pth}")
@@ -36,7 +36,7 @@ def main():
     try:
         ep = torch.export.export(model, example_inputs)
     except Exception as e:
-        print(f"❌ Tracing failed: {e}")
+        print(f"[ERROR] Tracing failed: {e}")
         return
 
     print("Lowering to edge dialect...")
@@ -52,7 +52,7 @@ def main():
         f.write(exec_prog.buffer)
     
     size_mb = pte_out.stat().st_size / 1_048_576
-    print(f"\n✅ ExecuTorch export complete")
+    print(f"\n[OK] ExecuTorch export complete")
     print(f"   └─ {pte_out} ({size_mb:.1f} MB)")
 
     print("Writing metadata YAML...")

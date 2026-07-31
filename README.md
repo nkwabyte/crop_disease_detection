@@ -5,7 +5,7 @@ Object detection system for diagnosing diseases in corn, pepper, and tomato crop
 
 The system uses a **two-stage pipeline**: a crop-type classifier first identifies the leaf species, then a disease detector runs on images confirmed to be from a known crop. This prevents cross-crop false positives (e.g., mango leaves being labelled as Tomato diseases).
 
-Five training scripts are provided:
+Eight training scripts are provided:
 
 | Script | Purpose | Architecture | Output |
 | ------ | ------- | ------------ | ------ |
@@ -15,6 +15,29 @@ Five training scripts are provided:
 | `src/fasterrcnn/train_fasterrcnn.py` | Stage 2 — Faster RCNN baseline | ResNet-50-FPN-v2 | `outputs/fasterrcnn_output/` |
 | `src/fasterrcnn/train_alt_fasterrcnn.py` | Ablation study | 7 Faster RCNN variants | `outputs/alt_fasterrcnn_output/` |
 | `src/fasterrcnn/train_final.py` | Stage 2 — **SE-FPN final model** | ResNet-50-FPN-v2 + SE attention | `outputs/final_output/` |
+| `src/vit/train_vit.py` | Stage 2 — **ViTDet detector** | ViT-B/16 backbone + Faster RCNN head | `outputs/vit_output/` |
+| `src/swin/train_swin.py` | Stage 2 — **Swin detector** | Swin-V2-T + FPN + Faster RCNN head | `outputs/swin_output/` |
+| `src/rtdetr/train_rtdetr.py` | Stage 2 — **RT-DETR detector** | RT-DETR-L (transformer query head) | `outputs/rtdetr_output/` |
+
+## Environment
+
+Main training runs on the GPU server; local development is on an Apple Silicon Mac.
+
+- **Local (macOS, Python 3.11):** use [`requirements-py311.txt`](requirements-py311.txt) —
+  the tested env for the whole training/export/benchmark stack plus the Gradio app
+  (torch 2.11, torchvision 0.26, executorch 1.2, ultralytics 8.4, onnx/onnxruntime, gradio 6):
+
+  ```bash
+  python3.11 -m venv .venv
+  ./.venv/bin/pip install -r requirements-py311.txt
+  ```
+
+  > Python 3.14 is **not** usable here: `torch`/`torchvision` have 3.14 wheels but
+  > **`executorch` does not**, and executorch produces the `.pte` mobile artifacts.
+
+- **GPU server (Python 3.13):** the pinned [`requirements.txt`](requirements.txt) was
+  frozen on 3.13 (`audioop-lts`, `ipython 9.12`, … require ≥3.12/3.13) and is kept for
+  that interpreter.
 
 ## Documentation
 
@@ -464,7 +487,7 @@ across backbone depth, RPN proposal count, NMS policy, and anchor scale.
 | --- | --------- | -------- | --------- | ---------- | ------------ | ---- |
 | 1 | `mobilenet_300` | MobileNetV3-FPN (~19M params) | 300 | 0.7 | default | Lightweight baseline |
 | 2 | `resnet50_100` | ResNet50-FPN-v2 (~43M params) | 100 | 0.7 | default | Low-proposal ablation |
-| 3 | `resnet50_300` | ResNet50-FPN-v2 (~43M params) | 300 | 0.7 | default | **Selected model ★** |
+| 3 | `resnet50_300` | ResNet50-FPN-v2 (~43M params) | 300 | 0.7 | default | **Selected model (*)** |
 | 4 | `resnet50_1000` | ResNet50-FPN-v2 (~43M params) | 1000 | 0.7 | default | High-proposal ablation |
 | 5 | `resnet50_no_nms` | ResNet50-FPN-v2 (~43M params) | 300 | 1.0 | default | NMS disabled |
 | 6 | `resnet50_small_anchors` | ResNet50-FPN-v2 (~43M params) | 300 | 0.7 | 16–256 px | Disease-lesion optimised |
@@ -700,6 +723,194 @@ python train_final.py --export-only
 
 ---
 
+## ViTDet — Vision Transformer Detector — `src/vit/train_vit.py`
+
+A transformer-backbone detector added for the research benchmark and as a
+farmer-selectable model option in the mobile app. The backbone is a torchvision
+**ViT-B/16** (ImageNet-pretrained) whose patch tokens are reshaped into a 2-D
+feature map and fed to the **same Faster RCNN detection head** (RPN + RoI) used by
+the ResNet pipelines. Holding the head constant isolates the backbone, giving a
+clean *"CNN backbone vs Transformer backbone"* comparison for the paper.
+
+The `src/vit/` package is **fully self-contained** — it copies the dataset,
+hard-negative download, evaluation, checkpointing, figures and export rather than
+importing them from `src/fasterrcnn/`, so the two packages stay decoupled.
+
+### Design notes
+
+- **Fixed square input.** ViT positional embeddings are resolution-specific, so
+  every image is resized to exactly 640×640 via `GeneralizedRCNNTransform(fixed_size=…)`.
+  The pretrained 14×14 (@224) pos-embeddings are bicubic-interpolated to the
+  40×40 (@640) token grid with torchvision's `interpolate_embeddings`.
+- **Single-scale feature map** (stride 16). A 1×1 projection maps the 768-dim
+  tokens → 256 channels to match the detection head's expected width.
+- **AdamW + low LR** (ViT fine-tuning), linear warmup → cosine decay, gradient
+  accumulation for a larger effective batch, backbone frozen for the first 5 epochs.
+
+### Quick start (ViTDet)
+
+```bash
+python -m src.vit.train_vit --dry-run     # 2-epoch timing estimate
+python -m src.vit.train_vit               # full pipeline (negatives → train → figures → export)
+python -m src.vit.train_vit --export-only # re-export best checkpoint to mobile formats
+```
+
+### All commands (ViTDet)
+
+| Command | When to use |
+| ------- | ----------- |
+| `python -m src.vit.train_vit` | Full pipeline from scratch |
+| `python -m src.vit.train_vit --dry-run` | 2-epoch timing estimate |
+| `python -m src.vit.train_vit --skip-negatives` | Negatives already downloaded |
+| `python -m src.vit.train_vit --figures-only` | Regenerate figures only |
+| `python -m src.vit.train_vit --export-only` | Re-export best checkpoint |
+| `python -m src.vit.train_vit --no-figures` | Train without figures |
+| `python -m src.vit.train_vit --epochs 20` | Override epoch count |
+| `python -m src.vit.train_vit --batch-size 4` | Override batch size (e.g. on the GPU server) |
+| `python -m src.vit.train_vit --no-pretrained` | Random-init ViT (ablation) |
+
+### Training configuration (ViTDet)
+
+| Parameter | Value | Notes |
+| --------- | ----- | ----- |
+| Backbone | ViT-B/16 (ImageNet-pretrained) | ~86M params; 12 encoder blocks |
+| Detection head | Faster RCNN (RPN + RoI) | Identical to the ResNet pipeline |
+| num_classes | 24 | 23 disease classes (1–23) + background (0) |
+| Image size | 640 × 640 (fixed square) | 40×40 = 1,600 patch tokens |
+| Batch size | 2 (effective 8) | Grad accumulation ×4; raise on CUDA |
+| Optimizer | AdamW (weight decay 1e-4) | ViT fine-tunes poorly under SGD 5e-3 |
+| Learning rate | 1e-4 → cosine decay | Linear warmup 3 epochs |
+| Backbone freeze | First 5 epochs | Head + projection train first |
+| Gradient clip | 5.0 | |
+| Hard negatives | 200 images | Empty annotations; shared `data/negatives/` |
+| Eval frequency | Every 3 epochs | VOC mAP@0.5 |
+| Workers | 0 (MPS) / 8 (CUDA) | |
+| Device | MPS / CUDA / CPU | Auto-detected |
+
+> **Hardware note.** ViT-B/16 at 640px (1,600 tokens) is memory-heavy. On the
+> M4 Pro (24 GB) keep `--batch-size 2`; on the CUDA GPU server raise it and the
+> DataLoader workers. Positional-embedding interpolation happens once at build time.
+
+### Mobile export (ViTDet)
+
+Exported to `outputs/vit_output/models/`, mirroring the Faster RCNN export pipeline:
+
+| File | Format | Use case |
+| ---- | ------ | -------- |
+| `crop_disease_vit.ptl` | TorchScript mobile | Android / iOS via LibTorch (**primary**) |
+| `crop_disease_vit.onnx` | ONNX | Any ONNX Runtime (universal fallback) |
+| `crop_disease_vit_backbone.pte` | ExecuTorch | ViT backbone feature extractor (exports cleanly — static shapes) |
+| `crop_disease_vit.pte` | ExecuTorch | Full model (if dynamic RPN/RoI export succeeds) |
+| `model_metadata.yaml` | YAML | Class names, thresholds, input spec |
+
+> The **ViT backbone is more ExecuTorch-friendly than ResNet-FPN** (pure static-shape
+> attention/MLP, no dynamic FPN ops), so `crop_disease_vit_backbone.pte` exports
+> reliably. The two-stage RPN+RoI head has the same dynamic-control-flow caveat as
+> the Faster RCNN full-model `.pte`; the `.ptl` is the primary on-device target.
+
+### Generated figures (ViTDet)
+
+| File | Contents |
+| ---- | -------- |
+| `fig_01_dataset_overview.png` | Images + annotations per split |
+| `fig_02_vit_architecture.png` | ViTDet pipeline: patchify → pos-embed → encoder → head |
+| `fig_03_lr_schedule.png` | AdamW warmup + cosine LR schedule |
+| `fig_08_training_metrics.png` | Loss components + validation mAP@0.5 (post-training) |
+| `fig_09_per_class_ap.png` | Per-class AP@0.5 bar chart (post-training) |
+
+The final test-set evaluation is also written to
+`outputs/vit_output/final_eval.json` and copied to `outputs/benchmarks/vitdet_vit_b16.json`
+for the cross-model comparison (see **Model Benchmarking** below).
+
+---
+
+## Swin — Hierarchical Transformer Detector — `src/swin/train_swin.py`
+
+A hierarchical Vision Transformer detector complementing the single-scale ViTDet.
+The torchvision **Swin-V2-T** backbone produces a genuine multi-scale feature pyramid
+(/4, /8, /16, /32), wrapped in an **FPN** and fed to the same Faster RCNN head — a
+natural *"plain vs hierarchical transformer"* comparison, and usually stronger on
+small disease lesions thanks to the finer feature levels.
+
+Unlike ViT, Swin uses windowed attention with relative position bias, so it handles
+variable input sizes (no fixed-square resize needed). The `src/swin/` package is
+**fully self-contained** (dataset, eval, figures, export copied in, not imported).
+
+### Quick start (Swin)
+
+```bash
+python -m src.swin.train_swin --dry-run     # 2-epoch timing estimate
+python -m src.swin.train_swin               # full pipeline
+python -m src.swin.train_swin --export-only # re-export best checkpoint
+```
+
+Commands mirror the ViTDet script (`--skip-negatives`, `--figures-only`,
+`--no-figures`, `--epochs`, `--batch-size`, `--no-pretrained`).
+
+### Training configuration (Swin)
+
+| Parameter | Value | Notes |
+| --------- | ----- | ----- |
+| Backbone | Swin-V2-T (ImageNet-pretrained) | ~28M params; 4-stage hierarchy |
+| Detection head | FPN (out 256) + Faster RCNN | 5-level pyramid (default anchors) |
+| num_classes | 24 | 23 disease classes (1–23) + background (0) |
+| Image size | 640 (min/max) | Multi-scale features /4 … /32 |
+| Batch size | 2 (effective 8) | Grad accumulation ×4; raise on CUDA |
+| Optimizer | AdamW, LR 1e-4 → cosine | Warmup 3 epochs; backbone freeze 5 epochs |
+| Hard negatives | 200 | Shared `data/negatives/` |
+
+### Mobile export (Swin)
+
+Exported to `outputs/swin_output/models/`:
+
+| File | Format | Use case |
+| ---- | ------ | -------- |
+| `crop_disease_swin.onnx` | ONNX | Full-model deployable path (**primary**) |
+| `crop_disease_swin_backbone.pte` | ExecuTorch | Swin+FPN backbone (~121 MB — lighter than ViT) |
+| `model_metadata.yaml` | YAML | Class names, thresholds, input spec |
+
+> The Swin backbone `.pte` exports cleanly. The full two-stage model keeps the same
+> dynamic RPN/RoI `.pte` caveat as Faster RCNN, and TorchScript is unavailable for
+> Swin's dynamic backbone loop — so **ONNX is the full-model deliverable** here.
+
+---
+
+## RT-DETR — Transformer Query Detector — `src/rtdetr/train_rtdetr.py`
+
+A **query-based transformer detector** (Ultralytics **RT-DETR-L**): no anchors, no NMS.
+Whereas the ViT and Swin detectors swap the *backbone* under a region-based head,
+RT-DETR replaces the *detection paradigm* itself — completing the paper's comparison
+matrix (CNN/Transformer **backbone** × region/query **head**).
+
+Because RT-DETR inference is static-shape (fixed object queries, no NMS), it is the
+most **ExecuTorch-friendly full model** of the transformer detectors — it can export
+as a single end-to-end `.pte` the app consumes directly, exactly like YOLO26. It trains
+on the same YOLO-format `data/main/` dataset with the same 0-indexed class order.
+
+### Quick start (RT-DETR)
+
+```bash
+python -m src.rtdetr.train_rtdetr --dry-run    # 1-epoch timing estimate
+python -m src.rtdetr.train_rtdetr              # full pipeline
+python -m src.rtdetr.export_rtdetr             # export ONNX + ExecuTorch .pte
+```
+
+Ultralytics auto-saves training curves, PR curves and the confusion matrix under
+`outputs/rtdetr_output/`; the script adds `final_eval.json` +
+`outputs/benchmarks/rtdetr_l.json` for the cross-model comparison.
+
+### Mobile export (RT-DETR)
+
+Exported to `models/` by `export_rtdetr.py`:
+
+| File | Format | Use case |
+| ---- | ------ | -------- |
+| `crop_disease_rtdetr.pte` | ExecuTorch | **Full end-to-end model** (NMS-free → exports whole) |
+| `crop_disease_rtdetr.onnx` | ONNX | Universal fallback |
+| `rtdetr_metadata.yaml` | YAML | Class names, thresholds, input spec |
+
+---
+
 ## Publication Figures
 
 ### YOLO26 — `outputs/yolo_output/`
@@ -758,6 +969,73 @@ Generated by `python train_final.py` or `python train_final.py --figures-only`.
 | `fig_13_cross_model_comparison.png` | SE-FPN final vs Faster RCNN v2 baseline: mAP, FPS, param count |
 | `fig_14_bbox_geometry.png` | Width/height scatter, aspect-ratio distribution, area by crop type |
 | `fig_15_summary.png` | One-page summary panel covering all 8 custom research contributions |
+
+---
+
+## Model Benchmarking
+
+All pipelines persist their training curves and final metrics so the models can be
+compared head-to-head for the paper:
+
+| Model | Saved training data | Final metrics |
+| ----- | ------------------- | ------------- |
+| Crop classifier | `metrics_history.json` (loss/acc curves) + figures | — |
+| YOLO26 | Ultralytics `results.csv` + figures | `results.csv` (mAP@0.5) |
+| Faster RCNN v2 | `metrics_history.json` + 11 figures | `final_eval.json` (mAP + per-class AP) |
+| Ablation (7 configs) | `results.json` + figures | `results.json` |
+| SE-FPN final | `metrics_history.json` + 15 figures | `final_eval.json` (mAP + per-class AP) |
+| ViTDet | `metrics_history.json` + figures | `final_eval.json` (mAP + per-class AP) |
+| Swin | `metrics_history.json` + figures | `final_eval.json` (mAP + per-class AP) |
+| RT-DETR | Ultralytics curves + PR/confusion figures | `final_eval.json` (mAP@0.5) |
+
+Each detector also drops a copy of its final summary into `outputs/benchmarks/<model>.json`.
+The aggregator reads whatever exists and builds a unified comparison — it never re-runs a
+model, so it is safe to run any time and degrades gracefully when a model is untrained:
+
+```bash
+python -m src.benchmark.compare_models
+```
+
+Outputs (to `outputs/benchmarks/`):
+
+| File | Contents |
+| ---- | -------- |
+| `comparison.json` | Unified machine-readable table (all detectors + classifier) |
+| `comparison_table.md` | Paper-ready markdown table |
+| `fig_map_comparison.png` | mAP@0.5 bar chart across detection models |
+| `fig_params_vs_map.png` | Model size vs accuracy scatter |
+| `fig_per_class_heatmap.png` | Per-class AP@0.5 heatmap (models × 23 classes) |
+
+### Quantization (INT8 → ExecuTorch) and latency
+
+Two deployment-cost tools live alongside the accuracy aggregator:
+
+```bash
+python -m src.benchmark.quantize    # PT2E static INT8 → XNNPACK .pte (~4× smaller)
+python -m src.benchmark.latency     # size + CPU latency of every exported .pte / .onnx
+```
+
+`quantize.py` produces INT8 `.pte` files next to their fp32 counterparts and
+**fidelity-checks each one** against the fp32 source, warning loudly if quantization
+degraded it. Requires `flatc` on `PATH` (`brew install flatbuffers`, or the copy at
+`.venv/bin/flatc`).
+
+Findings so far (measured on the M4 Pro):
+
+- Static PTQ preserves accuracy on **CNN backbones** (ResNet family — 100% top-1
+  agreement, ~3.8× smaller) — the right path for the Faster RCNN / Swin backbones.
+- It **collapses EfficientNet-B2** (the Stage-1 classifier): SiLU + squeeze-excite are
+  PTQ-fragile, so top-1 agreement drops to ~0.13. The classifier needs **QAT** (or ship
+  it fp32). The tool detects and reports this rather than shipping a broken model.
+- **Size** shrinks ~4× across the board; on Apple Silicon **latency is roughly flat**
+  (fp32 NEON is already fast) — the CPU speed-up from INT8 shows on mid-range Android.
+
+`latency.py` writes `outputs/benchmarks/{latency.json, latency_table.md, fig_latency.png}`.
+Host-CPU numbers indicate the mobile-CPU ordering; for exact device timings, profile the
+`.pte` on the target phone.
+
+See [`docs/08_next_steps.md`](docs/08_next_steps.md) for recommended additional models
+and experiments to strengthen the benchmark for publication.
 
 ---
 

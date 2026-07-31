@@ -20,7 +20,7 @@ Seven configurations are trained and evaluated under identical conditions (same 
 |---|---|---|---|---|---|---|
 | 1 | `mobilenet_300` | MobileNetV3-Large-FPN (~19 M params) | 300 | 0.7 | Default | Lightweight baseline |
 | 2 | `resnet50_100` | ResNet50-FPN-v2 (~43 M params) | 100 | 0.7 | Default | Low-proposal ablation |
-| 3 | `resnet50_300` | ResNet50-FPN-v2 (~43 M params) | 300 | 0.7 | Default | **Selected baseline ★** |
+| 3 | `resnet50_300` | ResNet50-FPN-v2 (~43 M params) | 300 | 0.7 | Default | **Selected baseline (*)** |
 | 4 | `resnet50_1000` | ResNet50-FPN-v2 (~43 M params) | 1000 | 0.7 | Default | High-proposal ablation |
 | 5 | `resnet50_no_nms` | ResNet50-FPN-v2 (~43 M params) | 300 | 1.0 | Default | NMS disabled |
 | 6 | `resnet50_small_anchors` | ResNet50-FPN-v2 (~43 M params) | 300 | 0.7 | 16–256 px | Disease-lesion optimised |
