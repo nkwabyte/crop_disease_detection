@@ -22,7 +22,8 @@ BENCHMARK_DIR = PROJECT_ROOT / "outputs" / "benchmarks"
 # ── Model & Hyperparameters ───────────────────────────────────────────────────
 MODEL_SIZE     = "rtdetr-l"   # Ultralytics RT-DETR large (rtdetr-l.pt / rtdetr-l.yaml)
 IMG_SIZE       = 640
-BASE_BATCH     = 4            # RT-DETR is heavier than yolo26n; raise on the GPU server
+BASE_BATCH     = 4            # default on MPS/CPU (M4 Pro)
+CUDA_BATCH     = 16           # default when a CUDA GPU is detected (96 GB RTX PRO 6000)
 EPOCHS_DEFAULT = 120
 PATIENCE       = 25
 CONF_THRESHOLD = 0.50

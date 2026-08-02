@@ -16,7 +16,8 @@ MODELS_DIR.mkdir(exist_ok=True)
 # ── Model & Hyperparameters ───────────────────────────────────────────────────
 MODEL_SIZE     = MODELS_DIR / "yolo26n.pt"   # pretrained weights saved in models/
 IMG_SIZE       = 640
-BASE_BATCH     = 32          # per-GPU; 32 × yolo26n fits comfortably in 24 GB
+BASE_BATCH     = 32          # per-GPU default on MPS/CPU; 32 × yolo26n fits in 24 GB
+CUDA_BATCH     = 64          # per-GPU default when a CUDA GPU is detected (96 GB RTX PRO 6000)
 EPOCHS_DEFAULT = 200
 PATIENCE       = 25
 CONF_THRESHOLD = 0.50

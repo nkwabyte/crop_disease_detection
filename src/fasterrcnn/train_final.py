@@ -114,6 +114,7 @@ from src.fasterrcnn.config import (
     NUM_CLASSES,
     IMG_SIZE,
     BATCH_SIZE,
+    CUDA_BATCH_SIZE,
     ACCUM_STEPS,
     LR0,
     WEIGHT_DECAY,
@@ -1766,6 +1767,8 @@ def main():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("--epochs",          type=int, default=EPOCHS_DEFAULT)
+    parser.add_argument("--batch-size",      type=int, default=None,
+                        help=f"Override batch size (default: {BATCH_SIZE} MPS/CPU, {CUDA_BATCH_SIZE} CUDA)")
     parser.add_argument("--dry-run",         action="store_true",
                         help="2 epochs, print timing estimate")
     parser.add_argument("--skip-negatives",  action="store_true",
@@ -1830,10 +1833,12 @@ def main():
 
         val_df  = _load_csv(VAL_CSV)
         val_ds  = CropDiseaseDataset(val_df, VAL_IMG_DIR, transform=get_val_transform())
-        workers = 0 if device.type == "mps" else min(8, os.cpu_count() or 1)
-        val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE, shuffle=False,
+        is_cuda = device.type == "cuda"
+        workers = 0 if device.type == "mps" else min(16 if is_cuda else 8, os.cpu_count() or 1)
+        vbatch  = args.batch_size if args.batch_size is not None else (CUDA_BATCH_SIZE if is_cuda else BATCH_SIZE)
+        val_loader = DataLoader(val_ds, batch_size=vbatch, shuffle=False,
                                 num_workers=workers,
-                                pin_memory=(device.type == "cuda"),
+                                pin_memory=is_cuda,
                                 collate_fn=collate_fn)
         print("  Running evaluation for figures …")
         eval_res = evaluate(model, val_loader, device, use_tta=use_tta)
@@ -1866,13 +1871,15 @@ def main():
     print(f"{'─'*66}")
 
     is_mps  = device.type == "mps"
-    workers = 0 if is_mps else min(8, os.cpu_count() or 1)
+    is_cuda = device.type == "cuda"
+    workers = 0 if is_mps else min(16 if is_cuda else 8, os.cpu_count() or 1)
+    batch   = args.batch_size if args.batch_size is not None else (CUDA_BATCH_SIZE if is_cuda else BATCH_SIZE)
 
-    if device.type == "cuda":
+    if is_cuda:
         torch.backends.cudnn.benchmark = True
 
     # AMP: CUDA only — 30-50% throughput gain with no accuracy cost on detection
-    scaler = torch.amp.GradScaler("cuda") if device.type == "cuda" else None
+    scaler = torch.amp.GradScaler("cuda") if is_cuda else None
 
     train_df = _load_csv(TRAIN_CSV)
     val_df   = _load_csv(VAL_CSV)
@@ -1885,11 +1892,13 @@ def main():
     val_ds = CropDiseaseDataset(val_df, VAL_IMG_DIR, transform=get_val_transform())
 
     train_loader = DataLoader(
-        train_ds, batch_size=BATCH_SIZE, shuffle=True,
-        num_workers=workers, pin_memory=not is_mps, collate_fn=collate_fn)
+        train_ds, batch_size=batch, shuffle=True,
+        num_workers=workers, pin_memory=not is_mps, collate_fn=collate_fn,
+        persistent_workers=(workers > 0))
     val_loader = DataLoader(
-        val_ds, batch_size=BATCH_SIZE, shuffle=False,
-        num_workers=workers, pin_memory=not is_mps, collate_fn=collate_fn)
+        val_ds, batch_size=batch, shuffle=False,
+        num_workers=workers, pin_memory=not is_mps, collate_fn=collate_fn,
+        persistent_workers=(workers > 0))
 
     print(f"  Train: {len(train_ds):,} ({len(train_df):,} annotated + {len(neg_paths)} negatives)")
     print(f"  Val:   {len(val_ds):,}")

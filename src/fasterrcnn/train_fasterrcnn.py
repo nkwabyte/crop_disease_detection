@@ -87,6 +87,7 @@ from src.fasterrcnn.config import (
     EPOCHS_DEFAULT,
     PATIENCE_DEFAULT as PATIENCE,
     BATCH_SIZE,
+    CUDA_BATCH_SIZE,
     LR0,
     WEIGHT_DECAY,
     MOMENTUM,
@@ -1387,6 +1388,8 @@ Examples:
                         help="Run 2 epochs; print epoch-time estimate")
     parser.add_argument("--epochs",         type=int, default=None,
                         help=f"Override epoch count (default: {EPOCHS_DEFAULT})")
+    parser.add_argument("--batch-size",     type=int, default=None,
+                        help=f"Override batch size (default: {BATCH_SIZE} MPS/CPU, {CUDA_BATCH_SIZE} CUDA)")
     parser.add_argument("--skip-negatives", action="store_true",
                         help="Skip hard-negative download/staging")
     parser.add_argument("--figures-only",   action="store_true",
@@ -1429,9 +1432,11 @@ Examples:
     print("\n─── Step 2/3: Training ───────────────────────────────────────────")
     device  = resolve_device()
     is_mps  = device.type == "mps"
-    workers = 0 if is_mps else min(8, os.cpu_count() or 1)
+    is_cuda = device.type == "cuda"
+    workers = 0 if is_mps else min(16 if is_cuda else 8, os.cpu_count() or 1)
+    batch   = args.batch_size if args.batch_size is not None else (CUDA_BATCH_SIZE if is_cuda else BATCH_SIZE)
 
-    if device.type == "cuda":
+    if is_cuda:
         torch.backends.cudnn.benchmark = True
 
     # AMP: CUDA only (fp16 autocast + loss scaling for 30-50% throughput gain)
@@ -1453,19 +1458,21 @@ Examples:
 
     train_loader = DataLoader(
         train_ds,
-        batch_size=BATCH_SIZE,
+        batch_size=batch,
         shuffle=True,
         num_workers=workers,
         collate_fn=collate_fn,
-        pin_memory=(device.type == "cuda"),   # CUDA only; MPS uses unified memory
+        pin_memory=is_cuda,   # CUDA only; MPS uses unified memory
+        persistent_workers=(workers > 0),
     )
     val_loader = DataLoader(
         val_ds,
-        batch_size=BATCH_SIZE,
+        batch_size=batch,
         shuffle=False,
         num_workers=workers,
         collate_fn=collate_fn,
-        pin_memory=(device.type == "cuda"),
+        pin_memory=is_cuda,
+        persistent_workers=(workers > 0),
     )
 
     n_train = len(train_ds)

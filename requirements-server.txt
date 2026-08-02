@@ -1,0 +1,38 @@
+# GPU training server requirements — Linux + NVIDIA CUDA (e.g. RTX PRO 6000, 96 GB).
+#
+# On Linux, `pip install torch==2.11.0 torchvision==0.26.0` pulls the CUDA build
+# automatically (cu12x wheels run on newer drivers, incl. the server's CUDA 13.x via
+# forward compatibility). No --index-url needed for a standard datacenter driver.
+#
+# Python 3.11–3.13 recommended (torch 2.11 has no 3.14 wheels).
+# Recreate:  python3 -m venv .venv && ./.venv/bin/pip install -r requirements-server.txt
+#
+# executorch/onnx are only needed for the EXPORT + QUANTIZE steps, not training —
+# if executorch fails to install on the server, training still runs; install it on
+# the machine that produces the mobile .pte artifacts.
+
+# ── Core DL stack (pinned — must match the export code) ─────────────────────────
+torch==2.11.0
+torchvision==0.26.0
+ultralytics==8.4.37
+
+# ── Export / quantization (optional on a train-only box) ────────────────────────
+executorch==1.2.0
+onnx==1.22.0
+onnxruntime==1.28.0
+coremltools==9.0
+
+# ── Data / science / plotting ───────────────────────────────────────────────────
+numpy>=2.1,<3
+pandas>=2.2
+scipy>=1.13
+scikit-learn>=1.5
+seaborn>=0.13
+matplotlib>=3.8
+opencv-python>=4.10
+pillow>=10.3
+pyyaml>=6.0
+tqdm>=4.66
+
+# ── Demo app (optional; not needed for training) ────────────────────────────────
+gradio>=6.0

@@ -39,7 +39,8 @@ SWIN_IN_CHANNELS   = [96, 192, 384, 768]   # stage output channels (swin_v2_t)
 # ── Hyperparameter Defaults ────────────────────────────────────────────────────
 EPOCHS_DEFAULT         = 40
 PATIENCE_DEFAULT       = 10
-BATCH_SIZE             = 2     # swin_v2_t (~28M) is lighter than ViT-B; raise on CUDA
+BATCH_SIZE             = 2     # default on MPS/CPU (M4 Pro 24 GB)
+CUDA_BATCH_SIZE        = 16    # swin_v2_t (~28M) is light; 96 GB RTX PRO 6000 handles this easily
 ACCUM_STEPS            = 4     # effective batch = BATCH_SIZE × ACCUM_STEPS
 LR0                    = 1e-4  # AdamW peak LR
 WEIGHT_DECAY           = 1e-4

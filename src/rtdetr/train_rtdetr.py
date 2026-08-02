@@ -39,7 +39,7 @@ import yaml
 
 from src.rtdetr.config import (
     PROJECT_ROOT, DATA_DIR, NEG_DIR, RTDETR_YAML, RUNS_DIR, EXP_NAME,
-    BENCHMARK_DIR, MODEL_SIZE, IMG_SIZE, BASE_BATCH, EPOCHS_DEFAULT, PATIENCE,
+    BENCHMARK_DIR, MODEL_SIZE, IMG_SIZE, BASE_BATCH, CUDA_BATCH, EPOCHS_DEFAULT, PATIENCE,
     CONF_THRESHOLD, IOU_THRESHOLD, NUM_NEGATIVES, CLASS_NAMES,
 )
 
@@ -197,9 +197,10 @@ def main() -> None:
 
     dry_run = args.dry_run or os.environ.get("DRY_RUN") == "1"
     epochs  = args.epochs if args.epochs is not None else (1 if dry_run else EPOCHS_DEFAULT)
-    batch   = args.batch_size if args.batch_size is not None else BASE_BATCH
     device  = resolve_device()
-    workers = 0 if device == "mps" else min(8, os.cpu_count() or 1)
+    is_cuda = device == 0 or (isinstance(device, str) and device.startswith("cuda"))
+    batch   = args.batch_size if args.batch_size is not None else (CUDA_BATCH if is_cuda else BASE_BATCH)
+    workers = 0 if device == "mps" else min(16 if is_cuda else 8, os.cpu_count() or 1)
 
     print("Step 1 — data yaml");        prepare_data_yaml()
     print("Step 2 — hard negatives");   prepare_hard_negatives(skip=args.skip_negatives)
