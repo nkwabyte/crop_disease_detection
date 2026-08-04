@@ -23,6 +23,9 @@ cd "$(dirname "$0")/.."
 MODEL="fasterrcnn"
 MODULE="src.fasterrcnn.train_fasterrcnn"
 
+# Unbuffered so `tee` streams progress live instead of block-buffering it.
+export PYTHONUNBUFFERED=1
+
 PY="${PY:-./.venv/bin/python}"
 [ -x "$PY" ] || PY="python3"
 mkdir -p logs

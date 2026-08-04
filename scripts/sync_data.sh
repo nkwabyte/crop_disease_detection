@@ -71,10 +71,11 @@ sync_subset() {
   local pct="${SUBSET_PCT:-10}"
   step "Dataset subset (${pct}%) → ${GPU_HOST}"
   python3 - "$pct" <<'PY' > /tmp/_subset_files.txt
-import csv, sys, os
+import csv, sys
 pct = int(sys.argv[1])
-for split, csvf in [("train","dataset/final_train_labels.csv"),
-                    ("validate","dataset/final_validate_labels.csv")]:
+for split, csvf in [("train",    "dataset/final_train_labels.csv"),
+                    ("validate", "dataset/final_validate_labels.csv"),
+                    ("test",     "dataset/final_test_labels.csv")]:
     rows = list(csv.DictReader(open(csvf)))
     # Round-robin by class so every label stays represented in the slice.
     by = {}
@@ -98,6 +99,34 @@ PY
   rsync -az dataset/*.csv dataset/label_map.json "${GPU_HOST}:${REMOTE_DIR}/dataset/" \
     || die "label sync failed"
   rm -f /tmp/_subset_files.txt
+
+  # The CSVs still reference every image, but only the slice is on the server —
+  # the loaders would fail on the missing files. Rewrite each CSV to the rows
+  # whose image actually exists, keeping the original as *.full.csv. A later
+  # full `sync_data.sh data` re-copies the unfiltered CSVs and undoes this.
+  step "Filtering label CSVs to the images present on the server"
+  ssh "$GPU_HOST" "cd ~/${REMOTE_DIR} && python3 - <<'PY'
+import csv, os, shutil
+for split, name in [('train','final_train_labels.csv'),
+                    ('validate','final_validate_labels.csv'),
+                    ('test','final_test_labels.csv')]:
+    path = os.path.join('dataset', name)
+    if not os.path.exists(path):
+        continue
+    full = path.replace('.csv', '.full.csv')
+    if not os.path.exists(full):
+        shutil.copy2(path, full)
+    with open(full, newline='') as fh:
+        rdr = csv.DictReader(fh)
+        fields, rows = rdr.fieldnames, list(rdr)
+    keep = [r for r in rows if os.path.exists(os.path.join('dataset', split, r['fname']))]
+    with open(path, 'w', newline='') as fh:
+        w = csv.DictWriter(fh, fieldnames=fields)
+        w.writeheader()
+        w.writerows(keep)
+    print(f'  {split:9} {len(keep):6,} / {len(rows):6,} rows kept')
+PY" || die "CSV filtering failed"
+
   echo "  ✓ subset synced — later a full 'sync_data.sh data' run tops up the rest"
 }
 

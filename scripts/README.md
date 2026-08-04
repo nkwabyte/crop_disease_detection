@@ -135,18 +135,61 @@ Every script:
 - **Reports wall-clock** on completion, and suggests a smaller batch on failure.
 - **Exits with the trainer's exit code**, so it composes in a larger pipeline.
 
-| Script | Module | 96 GB | **32 GB (5090)** | 24 GB |
-| ------ | ------ | ----- | ---------------- | ----- |
-| `train_classifier.sh` | `src.classifier.train_classifier` | 128 | **128** | 64 |
-| `train_yolo.sh` | `src.yolo.train` | 64 | **32** | 24 |
-| `train_fasterrcnn.sh` | `src.fasterrcnn.train_fasterrcnn` | 16 | **8** | 4 |
-| `train_final.sh` | `src.fasterrcnn.train_final` | 16 | **8** | 4 |
-| `train_vit.sh` | `src.vit.train_vit` | 8 | **4** | 2 |
-| `train_swin.sh` | `src.swin.train_swin` | 16 | **8** | 4 |
-| `train_rtdetr.sh` | `src.rtdetr.train_rtdetr` | 16 | **8** | 4 |
+| Script | Module | 96 GB | **32 GB (5090)** | 24 GB | Source |
+| ------ | ------ | ----- | ---------------- | ----- | ------ |
+| `train_classifier.sh` | `src.classifier.train_classifier` | 128 | **128** | 64 | estimated |
+| `train_yolo.sh` | `src.yolo.train` | 64 | **32** | 24 | estimated |
+| `train_fasterrcnn.sh` | `src.fasterrcnn.train_fasterrcnn` | 16 | **8** | 4 | estimated |
+| `train_final.sh` | `src.fasterrcnn.train_final` | 16 | **8** | 4 | estimated |
+| `train_vit.sh` | `src.vit.train_vit` | 8 | **16** | 2 | **measured** |
+| `train_swin.sh` | `src.swin.train_swin` | 16 | **16** | 4 | **measured** |
+| `train_rtdetr.sh` | `src.rtdetr.train_rtdetr` | 16 | **8** | 4 | estimated |
 
-These 32 GB values are **conservative starting points**. Watch `nvidia-smi` during the first
-epoch: if VRAM sits below ~70 % used, raise the batch with `BATCH=<n>` for faster epochs.
+Only the two rows marked *measured* have been verified on real hardware (see
+[Measured performance](#measured-performance)). The rest are deliberately conservative
+starting points. Watch `nvidia-smi` during the first epoch: if VRAM sits below ~70 % used,
+raise the batch with `BATCH=<n>` for faster epochs.
+
+## Measured performance
+
+RTX 5090 (31.4 GB), 32 cores, on a 10 % subset (4,076 train / 573 val), 2 epochs each:
+
+| Model | Batch | Backbone | 2 epochs | min/epoch | Peak VRAM | GPU util |
+| ----- | ----- | -------- | -------- | --------- | --------- | -------- |
+| ViT-B/16 @640 | 4 | frozen | 5.0 min | 2.50 | 1.7 GB | — |
+| ViT-B/16 @640 | 4 | unfrozen | 4.2 min | 2.10 | 4.9 GB | 37 % avg |
+| ViT-B/16 @640 | 16 | unfrozen | 3.3 min | 1.65 | 11.9 GB | 59 % avg, 99 % peak |
+| Swin-V2-T @640 | 16 | frozen | 3.1 min | 1.55 | 4.5 GB | 29 % avg |
+
+Extrapolated to the full 40,852-image train split (×10.02), ViT at batch 16 runs about
+**16.5 min/epoch, ~11 h for 40 epochs**; at batch 4 it is ~21 min/epoch, ~14 h.
+
+### Training is input-bound, not compute-bound
+
+The clearest evidence: the *unfrozen* ViT run was **faster** than the frozen one (4.2 vs
+5.0 min). Backpropagating through the backbone cannot be cheaper than skipping it — the
+difference is page cache, since the first run read every image cold from disk. GPU
+utilisation swinging 11 %→99 % and power drawing ~270 W of a 575 W TDP say the same thing.
+
+So the GPU idles a large fraction of the time, and buying a faster one buys little. The
+levers that would actually help, in order:
+
+1. **Dataloader workers.** Every trainer caps them at `min(16, cpu_count)` — on this
+   32-core box, half the cores sit idle. Raising the cap is a one-line change.
+2. **Prefetch depth.** The loaders set `pin_memory` and `persistent_workers` but leave
+   `prefetch_factor` at the default 2.
+3. **Decode cost.** Images are already 640×640, so workers spend their time on JPEG decode.
+   Decoding on the GPU (DALI / `nvjpeg`) or caching decoded tensors would remove it.
+
+Batch size is *not* the main lever: 4×-ing it only bought 1.27× throughput, exactly what
+you would expect when the GPU is waiting on input.
+
+### Re-measuring
+
+`--dry-run` is 2 epochs, but `FREEZE_BACKBONE_EPOCHS=5` in the ViT and Swin configs — so a
+plain dry-run **never unfreezes the backbone** and understates both VRAM and epoch time for
+the phase that dominates a real run. To measure the unfrozen phase, temporarily set
+`FREEZE_BACKBONE_EPOCHS = 0` in the model's `config.py`, run the dry-run, then restore it.
 
 Two scripts do extra work around training:
 
