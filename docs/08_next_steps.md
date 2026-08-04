@@ -19,6 +19,60 @@ no NMS). The gaps below are ordered by impact-to-effort.
 
 ---
 
+## ⏳ PENDING — run these on the next GPU box (A5000)
+
+Two things came out of the RTX 5090 trial (2026-08-04) that were deliberately *not*
+done then, because the trial was ending. Do them at the start of the next full
+training run.
+
+### A. YOLO26 capacity sweep — n vs s vs m
+
+**Why this is worth GPU hours:** it is a diagnosis, not a model beauty contest.
+
+The evidence for doing it: **two independent YOLO26n runs plateaued at the same
+place** — mAP50 **0.277** (previous full run, epoch 136) and ~0.25 at epoch 92 of the
+trial run. A ceiling hit twice is structural, and the likely structure is data
+volume: the YOLO split holds **3,199 training images across 23 disease classes,
+about 124 images per class**. That is a small-data regime, where extra capacity
+usually overfits rather than generalises.
+
+So the experiment resolves which ceiling you are against:
+
+| Outcome | What it means | What to do next |
+| ------- | ------------- | --------------- |
+| 26m jumps sharply | Capacity *is* limiting | Pursue 26s + INT8, or distillation (Tier-3 item 9) |
+| 26m gains ~nothing | The ceiling is **data**, not the model | Redirect effort to collecting images — and report it: *"detector capacity is not the bottleneck at this dataset scale"* is a legitimate, citable finding |
+
+Either result is publishable and changes what you do next. That asymmetry is the
+justification for the GPU time.
+
+**Include 26s, not just n and m.** It is the realistic mobile candidate if capacity
+turns out to help. Judge on **mAP per MB**, not mAP alone — the app already carries a
+29 MB classifier, and today's YOLO26n `.pte` is only 9.3 MB (38 MB total). A 26m
+detector would push the app past ~110 MB, which is a poor trade for a field app on
+mid-range Android where install size is a real data cost. `src/benchmark/quantize.py`
+(INT8) claws back roughly 4×, so *26s quantized* is the configuration to beat.
+
+Switching model size is one line: `MODEL_SIZE` in [`src/yolo/config.py`](../src/yolo/config.py).
+
+```bash
+# edit MODEL_SIZE to yolo26s.pt / yolo26m.pt between runs
+bash scripts/train_yolo.sh
+python -m src.benchmark.latency        # size + latency table for the comparison
+```
+
+### B. Raise the YOLO batch size — the GPU was 73 % idle
+
+During the trial run YOLO26n sat at **27 % GPU utilisation and 6.9 GB of 31.4 GB
+VRAM** at `--batch-size 32`. YOLO26n is a nano model; batch 32 does not come close to
+occupying a modern card. Whatever size you train next, push the batch up and watch
+`nvidia-smi` — this is close to free wall-clock.
+
+Note the A5000 has **24 GB**, not the 5090's 32 GB, so re-check headroom there rather
+than copying a number measured on the trial box.
+
+---
+
 ## Tier 1 — highest impact for the paper
 
 ### 1. RT-DETR / DETR-style query head (transformer *detection paradigm*) — [OK] DONE (`src/rtdetr/`)
