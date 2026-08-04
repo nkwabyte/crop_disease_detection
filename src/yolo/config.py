@@ -1,5 +1,6 @@
 """Configuration constants for YOLO26 crop disease detector."""
 
+import os
 from pathlib import Path
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
@@ -9,7 +10,7 @@ NEG_DIR      = PROJECT_ROOT / "data" / "negatives"
 FIXED_YAML   = PROJECT_ROOT / "data_fixed.yaml"
 RUNS_DIR     = PROJECT_ROOT / "runs"
 OUTPUT_DIR   = PROJECT_ROOT / "outputs" / "yolo_output"
-EXP_NAME     = "crop_disease_yolo26"
+EXP_NAME     = os.environ.get("YOLO_EXP", "crop_disease_yolo26")
 MODELS_DIR   = PROJECT_ROOT / "models"
 MODELS_DIR.mkdir(exist_ok=True)
 
@@ -19,7 +20,10 @@ MODELS_DIR.mkdir(exist_ok=True)
 # holds only ~124 training images per disease class, so capacity may not be what is
 # limiting. Sweep n -> s -> m on the next full run and judge on mAP per MB: the app
 # already carries a 29 MB classifier, and this detector's .pte is currently 9.3 MB.
-MODEL_SIZE     = MODELS_DIR / "yolo26n.pt"   # pretrained weights saved in models/
+# YOLO_MODEL / YOLO_EXP let a capacity sweep run without editing this file, and —
+# critically — give each variant its own runs/ directory so the sweep does not
+# overwrite the previous variant's weights.
+MODEL_SIZE     = Path(os.environ.get("YOLO_MODEL", MODELS_DIR / "yolo26n.pt"))
 IMG_SIZE       = 640
 BASE_BATCH     = 32          # per-GPU default on MPS/CPU; 32 × yolo26n fits in 24 GB
 # Measured on an RTX 5090: batch 32 left the GPU at 27 % utilisation and 6.9 GB of
