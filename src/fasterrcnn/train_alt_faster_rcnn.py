@@ -905,11 +905,16 @@ def generate_figures(per_class_ap: Optional[dict] = None) -> None:
     ax_sc.legend(handles=[mpatches.Patch(color=c, label=k) for k, c in CROP_PAL.items()])
 
     crop_order = ["Corn", "Pepper", "Tomato"]
+    # Tick labels are set afterwards rather than passed in: boxplot's `labels`
+    # kwarg was renamed `tick_labels` in matplotlib 3.9 and removed in 3.11, and
+    # requirements.txt allows >=3.8. Setting them on the axis works on every version.
     bp = ax_bp.boxplot(
         [tb2[tb2.crop == c].area_pct.values for c in crop_order],
-        labels=crop_order, patch_artist=True, showfliers=False,
+        patch_artist=True, showfliers=False,
         medianprops={"color": "black", "linewidth": 2},
     )
+    ax_bp.set_xticks(range(1, len(crop_order) + 1))
+    ax_bp.set_xticklabels(crop_order)
     for patch, crop in zip(bp["boxes"], crop_order):
         patch.set_facecolor(CROP_PAL[crop]); patch.set_alpha(0.75)
     ax_bp.set_ylabel("Box Area (% of image)"); ax_bp.set_title("Box Area by Crop")
