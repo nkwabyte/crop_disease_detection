@@ -36,7 +36,7 @@ command -v flatc >/dev/null 2>&1 || {
 }
 
 echo "  ▶ exporting SE-FPN final   (checkpoint: $CKPT)"
-"$PY" -m src.fasterrcnn.train_final --export-only "$@"
+"$PY" -m src.fasterrcnn.faster_rcnn_final --export-only "$@"
 rc=$?
 [ "$rc" -eq 0 ] && ls -lh outputs/final_output/models/*.pte models/*final* 2>/dev/null | awk '{print "    "$9"  "$5}'
 exit "$rc"

@@ -139,8 +139,8 @@ Every script:
 | ------ | ------ | ----- | ---------------- | ----- | ------ |
 | `train_classifier.sh` | `src.classifier.train_classifier` | 128 | **128** | 64 | estimated |
 | `train_yolo.sh` | `src.yolo.train` | 64 | **32** | 24 | estimated |
-| `train_fasterrcnn.sh` | `src.fasterrcnn.train_fasterrcnn` | 16 | **8** | 4 | estimated |
-| `train_final.sh` | `src.fasterrcnn.train_final` | 16 | **8** | 4 | estimated |
+| `train_fasterrcnn.sh` | `src.fasterrcnn.train_alt_faster_rcnn --mode baseline` | 16 | **8** | 4 | estimated |
+| `train_final.sh` | `src.fasterrcnn.faster_rcnn_final` | 16 | **8** | 4 | estimated |
 | `train_vit.sh` | `src.vit.train_vit` | 8 | **16** | 2 | **measured** |
 | `train_swin.sh` | `src.swin.train_swin` | 16 | **16** | 4 | **measured** |
 | `train_rtdetr.sh` | `src.rtdetr.train_rtdetr` | 16 | **8** | 4 | estimated |

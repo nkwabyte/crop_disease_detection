@@ -62,8 +62,8 @@ if has yolo; then
   run yolo        "$PY" -m src.yolo.train
   run yolo_export "$PY" -m src.yolo.export_yolo
 fi
-if has fasterrcnn;  then run fasterrcnn "$PY" -m src.fasterrcnn.train_fasterrcnn $(_bs "$BATCH_FRCNN"); fi
-if has final;       then run final      "$PY" -m src.fasterrcnn.train_final       $(_bs "$BATCH_FINAL"); fi
+if has fasterrcnn;  then run fasterrcnn "$PY" -m src.fasterrcnn.train_alt_faster_rcnn --mode baseline $(_bs "$BATCH_FRCNN"); fi
+if has final;       then run final      "$PY" -m src.fasterrcnn.faster_rcnn_final       $(_bs "$BATCH_FINAL"); fi
 if has vit;         then run vit        "$PY" -m src.vit.train_vit                 $(_bs "$BATCH_VIT"); fi
 if has swin;        then run swin       "$PY" -m src.swin.train_swin               $(_bs "$BATCH_SWIN"); fi
 if has rtdetr;      then

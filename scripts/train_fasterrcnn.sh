@@ -11,7 +11,7 @@
 #   BATCH=12 bash scripts/train_fasterrcnn.sh        # override the auto-picked batch
 #   bash scripts/train_fasterrcnn.sh --export-only   # re-export the best checkpoint
 #
-# Extra args pass through to `python -m src.fasterrcnn.train_fasterrcnn`.
+# Extra args pass through to `python -m src.fasterrcnn.train_alt_faster_rcnn --mode baseline`.
 # Logs to logs/fasterrcnn.log. Resume-aware — re-run to continue from the last checkpoint.
 # Exports at the end of training on its own; no separate export step.
 #
@@ -21,7 +21,9 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 MODEL="fasterrcnn"
-MODULE="src.fasterrcnn.train_fasterrcnn"
+MODULE="src.fasterrcnn.train_alt_faster_rcnn"
+# The baseline and the 7-config ablation now live in one module; select ours.
+MODE_ARG=(--mode baseline)
 
 # Unbuffered so `tee` streams progress live instead of block-buffering it.
 export PYTHONUNBUFFERED=1
@@ -55,11 +57,11 @@ esac
 echo "════════════════════════════════════════════════════════════════"
 echo "  ▶  ${MODEL}   ($(date '+%F %H:%M:%S'))"
 "$PY" -c "import torch; print('     GPU:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU only')" 2>/dev/null
-echo "     $PY -m $MODULE ${BATCH_ARG[*]} $*"
+echo "     $PY -m $MODULE ${MODE_ARG[*]} ${BATCH_ARG[*]} $*"
 echo "════════════════════════════════════════════════════════════════"
 
 start=$(date +%s)
-"$PY" -m "$MODULE" "${BATCH_ARG[@]}" "$@" 2>&1 | tee "logs/${MODEL}.log"
+"$PY" -m "$MODULE" "${MODE_ARG[@]}" "${BATCH_ARG[@]}" "$@" 2>&1 | tee "logs/${MODEL}.log"
 rc=${PIPESTATUS[0]}
 mins=$(( ($(date +%s) - start) / 60 ))
 

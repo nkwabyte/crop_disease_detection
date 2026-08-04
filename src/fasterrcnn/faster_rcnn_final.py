@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-train_final.py — SE-FPN Faster RCNN v2  (Final Production Model)
+faster_rcnn_final.py — SE-FPN Faster RCNN v2  (Final Production Model)
 
 Custom research contributions on top of the Faster RCNN v2 baseline:
 
@@ -44,16 +44,16 @@ Custom research contributions on top of the Faster RCNN v2 baseline:
 
 Usage
 -----
-  python train_final.py                       # full 4-step pipeline
-  python train_final.py --dry-run             # 2-epoch timing estimate
-  python train_final.py --skip-negatives      # skip hard-negative staging
-  python train_final.py --figures-only        # regenerate figures from best.pth
-  python train_final.py --export-only         # re-export best checkpoint
-  python train_final.py --no-figures          # train without figure generation
-  python train_final.py --no-ema              # disable EMA (faster iteration)
-  python train_final.py --no-tta              # disable TTA at final evaluation
-  python train_final.py --epochs 60           # override epoch count
-  DRY_RUN=1 python train_final.py
+  python faster_rcnn_final.py                       # full 4-step pipeline
+  python faster_rcnn_final.py --dry-run             # 2-epoch timing estimate
+  python faster_rcnn_final.py --skip-negatives      # skip hard-negative staging
+  python faster_rcnn_final.py --figures-only        # regenerate figures from best.pth
+  python faster_rcnn_final.py --export-only         # re-export best checkpoint
+  python faster_rcnn_final.py --no-figures          # train without figure generation
+  python faster_rcnn_final.py --no-ema              # disable EMA (faster iteration)
+  python faster_rcnn_final.py --no-tta              # disable TTA at final evaluation
+  python faster_rcnn_final.py --epochs 60           # override epoch count
+  DRY_RUN=1 python faster_rcnn_final.py
 """
 
 import argparse
