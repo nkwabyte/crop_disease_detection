@@ -58,6 +58,10 @@ Detailed documentation for each model is in the [`docs/`](docs/) folder:
 | [`docs/07_dataset.md`](docs/07_dataset.md) | Dataset — splits, class distribution, label conventions, citation |
 | [`docs/08_next_steps.md`](docs/08_next_steps.md) | Roadmap — additional models/experiments to strengthen the paper |
 | [`docs/09_gpu_server.md`](docs/09_gpu_server.md) | GPU server — setup, CUDA auto-scaling, training sweep, export |
+| [`docs/10_classifier_ood_adoption.md`](docs/10_classifier_ood_adoption.md) | Decision record — adopting the 4-class classifier with a learned `Other` class in the app |
+| [`docs/RENTING_GPU_WORKFLOW.md`](docs/RENTING_GPU_WORKFLOW.md) | Renting a monthly GPU — which tier, setup, data, checkpoints in and out |
+| [`scripts/README.md`](scripts/README.md) | Server connect/sync scripts, per-model training, measured performance |
+| [`scripts/export/README.md`](scripts/export/README.md) | ExecuTorch `.pte` conversion — run on your Mac, not the GPU box |
 
 ---
 
