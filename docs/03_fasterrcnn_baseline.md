@@ -1,8 +1,20 @@
 # Faster RCNN v2 Baseline Detector
 
-**Script:** `src/fasterrcnn/train_alt_faster_rcnn.py`  
+**Script:** `src/fasterrcnn/train_alt_faster_rcnn.py --mode baseline`  
 **Output directory:** `fasterrcnn_output/`  
 **Role:** Two-stage detection baseline; reference point for SE-FPN ablation
+
+```bash
+python -m src.fasterrcnn.train_alt_faster_rcnn --mode baseline
+python -m src.fasterrcnn.train_alt_faster_rcnn --mode baseline --dry-run
+```
+
+> This pipeline used to live in its own file, `train_fasterrcnn.py`. It now shares
+> `train_alt_faster_rcnn.py` with the [ablation study](04_fasterrcnn_ablation.md),
+> selected by `--mode`. `baseline` is the default, so an invocation with no mode
+> behaves exactly as the old script did, and every flag it accepted still works.
+> The two modes keep separate hyperparameters and output directories — see
+> [the README](../README.md#train_alt_faster_rcnnpy--one-file-two-pipelines).
 
 ---
 

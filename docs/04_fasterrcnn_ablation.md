@@ -1,8 +1,31 @@
 # Faster RCNN Ablation Study
 
-**Script:** `src/fasterrcnn/train_alt_faster_rcnn.py`  
+**Script:** `src/fasterrcnn/train_alt_faster_rcnn.py --mode ablation`  
 **Output directory:** `alt_fasterrcnn_output/`  
 **Role:** Systematic comparison of backbone depth, proposal count, NMS policy, and anchor scale to justify the final model architecture
+
+```bash
+python -m src.fasterrcnn.train_alt_faster_rcnn --mode ablation
+python -m src.fasterrcnn.train_alt_faster_rcnn --mode ablation --configs resnet50_300
+python -m src.fasterrcnn.train_alt_faster_rcnn --mode ablation --arch-figures
+```
+
+> **`--mode ablation` is required.** This study used to live in its own file,
+> `train_alt_fasterrcnn.py`; it now shares `train_alt_faster_rcnn.py` with the
+> [baseline](03_fasterrcnn_baseline.md), and `baseline` is the default mode. Omitting
+> `--mode ablation` silently runs the baseline instead.
+>
+> **The ablation's hyperparameters are `ABL_`-prefixed in the merged file** —
+> `ABL_EPOCHS_DEFAULT` (15), `ABL_PATIENCE` (5), `ABL_WARMUP_EPOCHS` (2),
+> `ABL_EVAL_EVERY` (3), `ABL_NUM_NEGATIVES` (100), `ABL_CLASS_NAMES`,
+> `ABL_MODELS_DIR`. The baseline uses the config defaults under the plain names.
+> This separation is deliberate: the two pipelines disagree on these values, and
+> sharing them would silently retrain one with the other's settings. If you add a
+> constant the two modes must not share, prefix it too.
+>
+> Checkpoint saving is also mode-specific: this study calls
+> **`save_ablation_checkpoint`**, whose signature leads with `config_id` because it
+> writes one checkpoint per configuration.
 
 ---
 

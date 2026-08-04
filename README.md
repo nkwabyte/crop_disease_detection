@@ -12,8 +12,8 @@ Eight training scripts are provided:
 | `src/classifier/generate_classifier_csv.py` | Build classifier CSVs | — | `dataset/classifier_*.csv` |
 | `src/classifier/train_classifier.py` | **Stage 1 — Crop classifier** | EfficientNet-B2 | `outputs/classifier_output/` |
 | `src/yolo/train.py` | Stage 2 — YOLO26 detector | YOLO26n (ultralytics) | `outputs/yolo_output/` |
-| `src/fasterrcnn/train_alt_faster_rcnn.py` | Stage 2 — Faster RCNN baseline | ResNet-50-FPN-v2 | `outputs/fasterrcnn_output/` |
-| `src/fasterrcnn/train_alt_faster_rcnn.py` | Ablation study | 7 Faster RCNN variants | `outputs/alt_fasterrcnn_output/` |
+| `src/fasterrcnn/train_alt_faster_rcnn.py --mode baseline` | Stage 2 — Faster RCNN baseline | ResNet-50-FPN-v2 | `outputs/fasterrcnn_output/` |
+| `src/fasterrcnn/train_alt_faster_rcnn.py --mode ablation` | Ablation study | 7 Faster RCNN variants | `outputs/alt_fasterrcnn_output/` |
 | `src/fasterrcnn/faster_rcnn_final.py` | Stage 2 — **SE-FPN final model** | ResNet-50-FPN-v2 + SE attention | `outputs/final_output/` |
 | `src/vit/train_vit.py` | Stage 2 — **ViTDet detector** | ViT-B/16 backbone + Faster RCNN head | `outputs/vit_output/` |
 | `src/swin/train_swin.py` | Stage 2 — **Swin detector** | Swin-V2-T + FPN + Faster RCNN head | `outputs/swin_output/` |
@@ -78,9 +78,9 @@ crop_disease_detection/
 │   │   ├── train.py           ← Stage 2: YOLO26 detector pipeline
 │   │   └── export_yolo.py     ← YOLO exporter
 │   ├── fasterrcnn/            ← Faster R-CNN models
-│   │   ├── train_alt_faster_rcnn.py --mode baseline     ← Stage 2: Faster R-CNN v2 baseline
-│   │   ├── train_alt_faster_rcnn.py --mode ablation ← Faster R-CNN ablation study (7 configs)
-│   │   └── faster_rcnn_final.py          ← Stage 2: SE-FPN final model
+│   │   ├── train_alt_faster_rcnn.py ← Faster R-CNN v2 baseline (--mode baseline)
+│   │   │                              + 7-config ablation study (--mode ablation)
+│   │   └── faster_rcnn_final.py     ← Stage 2: SE-FPN final model
 │   ├── classifier/            ← Crop-type classifier
 │   │   ├── train_classifier.py     ← Stage 1: EfficientNet-B2 crop-type classifier
 │   │   ├── export_classifier.py    ← Classifier ExecuTorch/ONNX exporter
@@ -379,6 +379,63 @@ To force a fresh start:
 rm -rf runs/crop_disease_yolo26
 python train.py
 ```
+
+---
+
+## `train_alt_faster_rcnn.py` — one file, two pipelines
+
+The Faster R-CNN baseline and the 7-configuration ablation study live in a single
+module, selected with `--mode`. They were separate files (`train_fasterrcnn.py` and
+`train_alt_fasterrcnn.py`) until they were merged.
+
+```bash
+# the production baseline — one model, figures, mobile export
+python -m src.fasterrcnn.train_alt_faster_rcnn --mode baseline
+python -m src.fasterrcnn.train_alt_faster_rcnn --mode baseline --dry-run
+
+# the ablation study — 7 configurations compared
+python -m src.fasterrcnn.train_alt_faster_rcnn --mode ablation
+python -m src.fasterrcnn.train_alt_faster_rcnn --mode ablation --configs resnet50_300
+```
+
+`--mode` is stripped before each pipeline's own argument parser runs, so every flag
+either pipeline accepted before the merge still works unchanged. **`--mode baseline`
+is the default**, so an invocation with no mode behaves exactly as the old
+`train_fasterrcnn.py` did.
+
+| | `--mode baseline` | `--mode ablation` |
+| --- | ----------------- | ----------------- |
+| Trains | 1 model (ResNet50-FPN-v2) | 7 configurations |
+| Output | `outputs/fasterrcnn_output/` | `outputs/alt_fasterrcnn_output/` |
+| Epochs | 30 (config default) | 15 (`ABL_EPOCHS_DEFAULT`) |
+| Patience / warmup | config | 5 / 2 (`ABL_*`) |
+| Hard negatives | config | 100 (`ABL_NUM_NEGATIVES`) |
+| Mixed precision | yes, on CUDA | no |
+| Exports mobile artifacts | yes | no — it is a comparison, not a deliverable |
+
+### Why the ablation's constants are `ABL_`-prefixed
+
+**This is the part to preserve when editing the file.** The two pipelines genuinely
+disagree on their hyperparameters — the ablation deliberately trains shorter (15
+epochs, patience 5, 100 negatives) because it is a *comparative* study, while the
+baseline uses the full config defaults. If both used the plain names, one pipeline
+would silently inherit the other's settings: no error, just wrong numbers.
+
+So every ablation-side value is prefixed — `ABL_EPOCHS_DEFAULT`, `ABL_PATIENCE`,
+`ABL_WARMUP_EPOCHS`, `ABL_EVAL_EVERY`, `ABL_NUM_NEGATIVES`, `ABL_CLASS_NAMES`,
+`ABL_MODELS_DIR` — and ablation code refers only to the prefixed names. **If you add
+a constant that the two modes should not share, prefix it too.**
+
+### What is shared, and what is not
+
+The dataset, transforms, evaluation, scheduler and checkpoint helpers are defined
+once, using the baseline's implementations. `train_one_epoch` takes an optional
+`GradScaler` that defaults to `None`, which is why the baseline gets AMP on CUDA and
+the ablation does not — the ablation simply does not pass one.
+
+The one helper that is *not* shared is `save_checkpoint`: the ablation's signature
+leads with `config_id` because it writes per-configuration checkpoints, so it lives
+alongside as **`save_ablation_checkpoint`**.
 
 ---
 
