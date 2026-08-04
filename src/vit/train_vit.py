@@ -169,9 +169,13 @@ class CropDiseaseDataset(Dataset):
         # 40,852-row train split that was ~7.7 ms of pure worker CPU per image.
         self._boxes  = {}
         self._labels = {}
+        # Images live under a per-crop subdirectory (data/detector/<split>/<Crop>/),
+        # so the crop is part of every image's path.
+        self._crop   = {}
         for _img_id, _grp in df.groupby("img_id", sort=False):
             self._boxes[_img_id]  = _grp[["x1", "y1", "x2", "y2"]].to_numpy(dtype=np.float32)
             self._labels[_img_id] = _grp["integer_label"].to_numpy(dtype=np.int64)
+            self._crop[_img_id]   = _grp["crop"].iloc[0]
         self.image_dir = Path(image_dir)
         self.transform = transform
         self.neg_paths = neg_paths or []
@@ -188,7 +192,7 @@ class CropDiseaseDataset(Dataset):
     def _get_positive(self, idx: int):
         img_id  = self.image_ids[idx]
 
-        img_path = self.image_dir / f"{img_id}.jpg"
+        img_path = self.image_dir / self._crop[img_id] / f"{img_id}.jpg"
         img = Image.open(img_path).convert("RGB")
         img_t = v2.functional.to_image(img)
         h, w  = img_t.shape[-2], img_t.shape[-1]

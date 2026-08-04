@@ -83,7 +83,7 @@ Transfers are **resumable at file level** — if the upload drops, re-run it and
 everything already copied. Safe to run repeatedly.
 
 What gets pushed: everything except `.venv/`, `outputs/`, `runs/`, `__pycache__/`. The
-datasets (`dataset/` ≈ 3.6 GB, `data/` ≈ 3.7 GB) are git-ignored, so they only reach the
+datasets (`data/detector/` ≈ 3.6 GB, `data/` ≈ 3.7 GB) are git-ignored, so they only reach the
 server through this script.
 
 > macOS ships **openrsync**, not GNU rsync, so these commands stick to flags both it and
@@ -219,7 +219,7 @@ across ≥5 repetitions and comparing medians. Do the same before believing a sp
 
 Two scripts do extra work around training:
 
-- `train_classifier.sh` generates `dataset/classifier_*.csv` first if they are missing, and
+- `train_classifier.sh` generates `data/yolo/classifier_*.csv` first if they are missing, and
   runs the ExecuTorch export afterwards.
 - `train_yolo.sh` and `train_rtdetr.sh` run their export step after a successful full run.
 

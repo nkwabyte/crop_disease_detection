@@ -4,7 +4,7 @@ from pathlib import Path
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-DATASET_DIR  = PROJECT_ROOT / "dataset"
+DATASET_DIR  = PROJECT_ROOT / "data" / "detector"
 NEG_DIR      = PROJECT_ROOT / "data" / "negatives"
 
 OUTPUT_DIR_BASELINE = PROJECT_ROOT / "outputs" / "fasterrcnn_output"

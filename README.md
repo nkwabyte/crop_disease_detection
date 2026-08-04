@@ -9,7 +9,7 @@ Eight training scripts are provided:
 
 | Script | Purpose | Architecture | Output |
 | ------ | ------- | ------------ | ------ |
-| `src/classifier/generate_classifier_csv.py` | Build classifier CSVs | — | `dataset/classifier_*.csv` |
+| `src/classifier/generate_classifier_csv.py` | Build classifier CSVs | — | `data/yolo/classifier_*.csv` |
 | `src/classifier/train_classifier.py` | **Stage 1 — Crop classifier** | EfficientNet-B2 | `outputs/classifier_output/` |
 | `src/yolo/train.py` | Stage 2 — YOLO26 detector | YOLO26n (ultralytics) | `outputs/yolo_output/` |
 | `src/fasterrcnn/train_alt_faster_rcnn.py --mode baseline` | Stage 2 — Faster RCNN baseline | ResNet-50-FPN-v2 | `outputs/fasterrcnn_output/` |
@@ -102,24 +102,28 @@ crop_disease_detection/
 │   ├── 06_two_stage_pipeline.md
 │   └── 07_dataset.md
 │
-├── data/                     ← YOLO dataset (Roboflow YOLO format)
-│   ├── main/
+├── data/                     ← All datasets live here
+│   ├── yolo/                 ← YOLO / RT-DETR format — also the classifier's source
 │   │   ├── train/            ← Training images + labels (hard negatives staged here)
 │   │   ├── valid/            ← Validation images + labels
-│   │   └── test/             ← Test images + labels
-│   └── negatives/            ← Shared hard-negative images (all pipelines)
-│
-├── dataset/                  ← Faster RCNN + classifier dataset
-│   ├── train/                ← Training images
-│   ├── validate/             ← Validation images
-│   ├── test/                 ← Test images
-│   ├── final_train_labels.csv
-│   ├── final_validate_labels.csv
-│   ├── final_test_labels.csv
-│   ├── classifier_train.csv  ← Crop-type classifier training split (2,861 images)
-│   ├── classifier_valid.csv  ← Crop-type classifier validation split (1,024 images)
-│   ├── classifier_test.csv   ← Crop-type classifier test split (1,016 images)
-│   └── label_map.json        ← Class name → integer label (1-indexed)
+│   │   ├── test/             ← Test images + labels
+│   │   ├── classifier_train.csv  ← Crop-type classifier training split (2,861 images)
+│   │   ├── classifier_valid.csv  ← Crop-type classifier validation split (1,024 images)
+│   │   └── classifier_test.csv   ← Crop-type classifier test split (1,016 images)
+│   │
+│   ├── detector/             ← Faster RCNN / ViT / Swin images, grouped by crop
+│   │   ├── train/{Corn,Pepper,Tomato}/     ← 40,852 images
+│   │   ├── validate/{Corn,Pepper,Tomato}/  ←  5,837 images
+│   │   ├── test/{Corn,Pepper,Tomato}/      ← 11,672 images
+│   │   ├── final_train_labels.csv          ← img_path points into the crop folders
+│   │   ├── final_validate_labels.csv
+│   │   ├── final_test_labels.csv
+│   │   └── label_map.json    ← Class name → integer label (1-indexed)
+│   │
+│   └── negatives/            ← Hard negatives (all pipelines) + non-target foliage
+│       ├── images/           ← Generic hard negatives for the detectors
+│       ├── ood/              ← Generic photographs for classifier rejection
+│       └── {eggplant,millet,potato,sorghum,tobacco}/  ← Near-miss crop leaves
 │
 ├── runs/
 │   └── crop_disease_yolo26/
@@ -194,12 +198,12 @@ python generate_classifier_csv.py
 python train_classifier.py
 ```
 
-Classifier CSVs are derived from the YOLO label files already in `data/main/`.
+Classifier CSVs are derived from the YOLO label files already in `data/yolo/`.
 Running `generate_classifier_csv.py` takes under a minute and produces:
 
-- `dataset/classifier_train.csv` (2,861 images)
-- `dataset/classifier_valid.csv` (1,024 images)
-- `dataset/classifier_test.csv` (1,016 images)
+- `data/yolo/classifier_train.csv` (2,861 images)
+- `data/yolo/classifier_valid.csv` (1,024 images)
+- `data/yolo/classifier_test.csv` (1,016 images)
 
 Hard-negative images (empty `.txt` labels, no crop assignment) are excluded
 automatically.
@@ -952,7 +956,7 @@ matrix (CNN/Transformer **backbone** × region/query **head**).
 Because RT-DETR inference is static-shape (fixed object queries, no NMS), it is the
 most **ExecuTorch-friendly full model** of the transformer detectors — it can export
 as a single end-to-end `.pte` the app consumes directly, exactly like YOLO26. It trains
-on the same YOLO-format `data/main/` dataset with the same 0-indexed class order.
+on the same YOLO-format `data/yolo/` dataset with the same 0-indexed class order.
 
 ### Quick start (RT-DETR)
 
@@ -1141,7 +1145,7 @@ The table below is the authoritative cross-reference. Rows are ordered by YOLO i
 > **Label indexing note:** YOLO uses 0-indexed labels in the order defined by
 > `src/yolo/config.py` / `data_fixed.yaml` (alphabetical within crop). Faster RCNN
 > reserves 0 for background and uses 1-indexed labels in the order defined by
-> `dataset/label_map.json` (which matches the `integer_label` column of the
+> `data/detector/label_map.json` (which matches the `integer_label` column of the
 > annotation CSVs the model actually trains on). The two orderings differ, so always
 > use the table above to map between them — never assume a fixed offset.
 
@@ -1345,13 +1349,13 @@ python faster_rcnn_final.py             # SE-FPN final — auto-resumes (EMA + s
 
 ## Dataset
 
-**YOLO pipeline** (`data/main/`):
+**YOLO pipeline** (`data/yolo/`):
 
 - Format: YOLO `.txt` labels (one file per image, normalised XYWH)
 - Source: [Ghana Crop Disease Challenge v2](https://universe.roboflow.com/ghanacropdiseasechallenge/ghana-crop-disease-challenge/dataset/2) — Roboflow, CC BY 4.0
 - Splits: train / valid / test (Roboflow auto-split)
 
-**Faster RCNN pipeline** (`dataset/`):
+**Faster RCNN pipeline** (`data/detector/`):
 
 - Format: CSV annotations with absolute pixel XYXY bounding boxes
 - `integer_label` values match `label_map.json` (1-indexed, 1 = Corn Cercospora … 23 = Tomato Mosaic)

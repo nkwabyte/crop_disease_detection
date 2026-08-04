@@ -53,15 +53,15 @@ Thumbs.db
 # Datasets & Auto-Generated CSVs
 # See docs/07_dataset.md for dataset download instructions
 # =============================================================================
-data/main/train/
-data/main/valid/
-data/main/test/
+data/yolo/train/
+data/yolo/valid/
+data/yolo/test/
 data/negatives/
 
-dataset/train/
-dataset/validate/
-dataset/test/
-dataset/classifier_*.csv
+data/detector/train/
+data/detector/validate/
+data/detector/test/
+data/yolo/classifier_*.csv
 
 # Auto-generated config (written by train.py at startup)
 data_fixed.yaml

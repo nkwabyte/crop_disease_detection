@@ -40,31 +40,29 @@ sync_code() {
   step "Code → ${GPU_HOST}:~/${REMOTE_DIR}"
   rsync -az \
     --exclude '.venv' --exclude 'outputs' --exclude 'runs' \
-    --exclude 'dataset' --exclude 'data' \
+    --exclude 'data' \
     --exclude '__pycache__' --exclude '*.pyc' --exclude '.DS_Store' \
     ./ "${GPU_HOST}:${REMOTE_DIR}/" || die "code sync failed"
   echo "  ✓ code synced ($(git rev-parse --short HEAD 2>/dev/null || echo 'no git') on this end)"
 }
 
-# Datasets. dataset/ ≈ 3.8 GB of JPEGs (classifier / RCNN / ViT / Swin),
-#           data/    ≈ 0.3 GB once caches are excluded (YOLO + RT-DETR).
+# All datasets now live under data/ :
+#   data/detector/  ≈ 3.8 GB — detector images, grouped by crop (RCNN / ViT / Swin)
+#   data/yolo/      ≈ 0.3 GB — YOLO / RT-DETR format, also the classifier's source
+#   data/negatives/ ≈ 0.5 GB — hard negatives + non-target foliage
 #
-# data/ measures 3.9 GB on disk, but 3.6 GB of that is *.npy — Ultralytics'
+# data/ measures ~7.7 GB on disk, but 3.6 GB of that is *.npy — Ultralytics'
 # `cache="disk"` sidecars (see src/yolo/train.py). They are regenerated on the
 # first epoch, and *.cache label indexes embed absolute paths, so shipping either
 # wastes hours of upload for files the server would rewrite anyway.
 sync_data() {
   step "Datasets → ${GPU_HOST} (~4.1 GB first time, resumable)"
-  echo "  dataset/ (~3.8 GB) ..."
-  rsync -az --exclude '.DS_Store' \
-    dataset "${GPU_HOST}:${REMOTE_DIR}/" || die "dataset sync failed"
-  echo "  data/ (~0.3 GB — skipping regenerable .npy/.cache) ..."
   rsync -az --exclude '.DS_Store' --exclude '*.npy' --exclude '*.cache' \
     data "${GPU_HOST}:${REMOTE_DIR}/" || die "data sync failed"
   echo "  ✓ datasets synced"
 }
 
-# A stratified slice of dataset/ — enough to measure real throughput (sec/iter)
+# A stratified slice of data/detector/ — enough to measure real throughput
 # without waiting out the full upload on a slow link. Epoch time scales linearly
 # with image count, so full-run estimates extrapolate from this exactly.
 sync_subset() {
@@ -73,31 +71,31 @@ sync_subset() {
   python3 - "$pct" <<'PY' > /tmp/_subset_files.txt
 import csv, sys
 pct = int(sys.argv[1])
-for split, csvf in [("train",    "dataset/final_train_labels.csv"),
-                    ("validate", "dataset/final_validate_labels.csv"),
-                    ("test",     "dataset/final_test_labels.csv")]:
+for split, csvf in [("train",    "data/detector/final_train_labels.csv"),
+                    ("validate", "data/detector/final_validate_labels.csv"),
+                    ("test",     "data/detector/final_test_labels.csv")]:
     rows = list(csv.DictReader(open(csvf)))
     # Round-robin by class so every label stays represented in the slice.
     by = {}
     for r in rows:
-        by.setdefault(r.get("integer_label", "0"), []).append(r["fname"])
-    for cls, names in by.items():
-        keep = max(1, len(names) * pct // 100)
-        for n in sorted(set(names))[:keep]:
-            print(f"{split}/{n}")
+        by.setdefault(r.get("integer_label", "0"), []).append((r["crop"], r["fname"]))
+    for cls, items in by.items():
+        keep = max(1, len(items) * pct // 100)
+        for crop, n in sorted(set(items))[:keep]:
+            print(f"{split}/{crop}/{n}")
 PY
   echo "  $(wc -l < /tmp/_subset_files.txt | tr -d ' ') images selected"
   # NOTE: macOS openrsync accepts --files-from but silently transfers nothing, so
   # this streams a tar instead. No -z: JPEGs are already compressed.
-  ssh "$GPU_HOST" "mkdir -p ~/${REMOTE_DIR}/dataset"
+  ssh "$GPU_HOST" "mkdir -p ~/${REMOTE_DIR}/data/detector"
   # --no-xattrs + COPYFILE_DISABLE stop macOS from shipping quarantine attributes
   # and ._AppleDouble sidecars, which GNU tar on the server only warns about.
-  COPYFILE_DISABLE=1 tar --no-xattrs -cf - -C dataset -T /tmp/_subset_files.txt \
-    | ssh "$GPU_HOST" "tar -xf - -C ~/${REMOTE_DIR}/dataset" \
+  COPYFILE_DISABLE=1 tar --no-xattrs -cf - -C data/detector -T /tmp/_subset_files.txt \
+    | ssh "$GPU_HOST" "tar -xf - -C ~/${REMOTE_DIR}/data/detector" \
     || die "subset sync failed"
   # The CSVs are small and the trainers need all of them present.
-  rsync -az dataset/*.csv dataset/label_map.json "${GPU_HOST}:${REMOTE_DIR}/dataset/" \
-    || die "label sync failed"
+  rsync -az data/detector/*.csv data/detector/label_map.json \
+    "${GPU_HOST}:${REMOTE_DIR}/data/detector/" || die "label sync failed"
   rm -f /tmp/_subset_files.txt
 
   # The CSVs still reference every image, but only the slice is on the server —
@@ -110,7 +108,7 @@ import csv, os, shutil
 for split, name in [('train','final_train_labels.csv'),
                     ('validate','final_validate_labels.csv'),
                     ('test','final_test_labels.csv')]:
-    path = os.path.join('dataset', name)
+    path = os.path.join('data/detector', name)
     if not os.path.exists(path):
         continue
     full = path.replace('.csv', '.full.csv')
@@ -119,7 +117,8 @@ for split, name in [('train','final_train_labels.csv'),
     with open(full, newline='') as fh:
         rdr = csv.DictReader(fh)
         fields, rows = rdr.fieldnames, list(rdr)
-    keep = [r for r in rows if os.path.exists(os.path.join('dataset', split, r['fname']))]
+    keep = [r for r in rows
+            if os.path.exists(os.path.join('data/detector', split, r['crop'], r['fname']))]
     with open(path, 'w', newline='') as fh:
         w = csv.DictWriter(fh, fieldnames=fields)
         w.writeheader()
@@ -141,15 +140,15 @@ pull_results() {
 
 check_counts() {
   step "File counts"
-  local_train=$(ls dataset/train 2>/dev/null | wc -l | tr -d ' ')
-  local_val=$(ls dataset/validate 2>/dev/null | wc -l | tr -d ' ')
-  local_test=$(ls dataset/test 2>/dev/null | wc -l | tr -d ' ')
+  local_train=$(find data/detector/train -name '*.jpg' 2>/dev/null | wc -l | tr -d ' ')
+  local_val=$(find data/detector/validate -name '*.jpg' 2>/dev/null | wc -l | tr -d ' ')
+  local_test=$(find data/detector/test -name '*.jpg' 2>/dev/null | wc -l | tr -d ' ')
   echo "  laptop : train=${local_train} validate=${local_val} test=${local_test}"
   ssh "$GPU_HOST" "cd ~/${REMOTE_DIR} 2>/dev/null && printf '  server : train=%s validate=%s test=%s\n' \
-    \$(ls dataset/train 2>/dev/null | wc -l) \
-    \$(ls dataset/validate 2>/dev/null | wc -l) \
-    \$(ls dataset/test 2>/dev/null | wc -l)"
-  ssh "$GPU_HOST" "cd ~/${REMOTE_DIR} 2>/dev/null && echo '  server disk:' && du -sh dataset data 2>/dev/null"
+    \$(find data/detector/train -name '*.jpg' 2>/dev/null | wc -l) \
+    \$(find data/detector/validate -name '*.jpg' 2>/dev/null | wc -l) \
+    \$(find data/detector/test -name '*.jpg' 2>/dev/null | wc -l)"
+  ssh "$GPU_HOST" "cd ~/${REMOTE_DIR} 2>/dev/null && echo '  server disk:' && du -sh data/* 2>/dev/null"
 }
 
 case "$MODE" in
