@@ -107,6 +107,45 @@ from src.classifier.config import (
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Runtime variant
+# ══════════════════════════════════════════════════════════════════════════════
+# Two models are trained from this file and compared:
+#
+#   base — the shipped 3-class model (Corn / Pepper / Tomato). Non-crop input is
+#          rejected only by thresholding the top softmax probability.
+#   ood  — a 4-class model with an explicit "Other" class trained on non-target
+#          foliage (eggplant, millet, potato, sorghum, tobacco) plus general
+#          photographs, so rejection is learned rather than thresholded.
+#
+# The class list, CSV prefix and output directory have to move together, so they
+# live here as rebindable globals rather than being read from config directly.
+# Defaults reproduce the 3-class model exactly, and `CropClassifier` below
+# deliberately keeps using CROP_CLASSES / OUTPUT_DIR so the Gradio app and the
+# exported .pte contract are unaffected by a variant run.
+
+CLASS_NAMES: list[str] = list(CROP_CLASSES)
+CSV_PREFIX: str = "classifier"
+RUN_DIR: Path = OUTPUT_DIR
+RUN_FIGURES_DIR: Path = FIGURES_DIR
+
+VARIANTS = {
+    "base": {"classes": list(CROP_CLASSES), "prefix": "classifier", "dir": OUTPUT_DIR},
+    "ood":  {"classes": list(CROP_CLASSES) + ["Other"], "prefix": "classifier_ood",
+             "dir": OUTPUT_DIR.parent / "classifier_ood_output"},
+}
+
+
+def apply_variant(name: str) -> None:
+    """Point the training/eval path at one variant's classes, CSVs and outputs."""
+    global CLASS_NAMES, CSV_PREFIX, RUN_DIR, RUN_FIGURES_DIR
+    v = VARIANTS[name]
+    CLASS_NAMES = list(v["classes"])
+    CSV_PREFIX = v["prefix"]
+    RUN_DIR = v["dir"]
+    RUN_FIGURES_DIR = RUN_DIR / "figures"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Dataset
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -161,9 +200,9 @@ def _make_loaders(
     num_workers: int,
     pin_memory: bool = False,
 ) -> tuple[DataLoader, DataLoader, DataLoader]:
-    train_ds = CropDataset(DATASET_DIR / "classifier_train.csv", "train")
-    valid_ds = CropDataset(DATASET_DIR / "classifier_valid.csv", "valid")
-    test_ds  = CropDataset(DATASET_DIR / "classifier_test.csv",  "test")
+    train_ds = CropDataset(DATASET_DIR / f"{CSV_PREFIX}_train.csv", "train")
+    valid_ds = CropDataset(DATASET_DIR / f"{CSV_PREFIX}_valid.csv", "valid")
+    test_ds  = CropDataset(DATASET_DIR / f"{CSV_PREFIX}_test.csv",  "test")
 
     kw = dict(
         batch_size=batch_size,
@@ -184,8 +223,15 @@ def _make_loaders(
 # Model
 # ══════════════════════════════════════════════════════════════════════════════
 
-def build_model(num_classes: int = NUM_CLASSES) -> nn.Module:
-    """EfficientNet-B2 with ImageNet weights; classifier head replaced."""
+def build_model(num_classes: int = None) -> nn.Module:
+    """EfficientNet-B2 with ImageNet weights; classifier head replaced.
+
+    num_classes defaults to the active variant's class count, resolved at call
+    time — a default of len(CLASS_NAMES) would bind at import, before
+    apply_variant() runs, and silently build a 3-class head for the OOD variant.
+    """
+    if num_classes is None:
+        num_classes = len(CLASS_NAMES)
     weights = EfficientNet_B2_Weights.DEFAULT
     model   = efficientnet_b2(weights=weights)
     in_features = model.classifier[1].in_features
@@ -273,7 +319,7 @@ def collect_predictions(
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _save(fig: plt.Figure, name: str) -> None:
-    path = FIGURES_DIR / name
+    path = RUN_FIGURES_DIR / name
     fig.savefig(path, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"  Saved {path.relative_to(PROJECT_ROOT)}")
@@ -313,15 +359,15 @@ def fig_confusion_matrix(true_labels: list[int], pred_labels: list[int]) -> None
         ["d", ".2f"],
     ):
         im = ax.imshow(data, cmap="Blues")
-        ax.set_xticks(range(NUM_CLASSES))
-        ax.set_yticks(range(NUM_CLASSES))
-        ax.set_xticklabels(CROP_CLASSES)
-        ax.set_yticklabels(CROP_CLASSES)
+        ax.set_xticks(range(len(CLASS_NAMES)))
+        ax.set_yticks(range(len(CLASS_NAMES)))
+        ax.set_xticklabels(CLASS_NAMES)
+        ax.set_yticklabels(CLASS_NAMES)
         ax.set_xlabel("Predicted")
         ax.set_ylabel("True")
         ax.set_title(title)
-        for i in range(NUM_CLASSES):
-            for j in range(NUM_CLASSES):
+        for i in range(len(CLASS_NAMES)):
+            for j in range(len(CLASS_NAMES)):
                 val = data[i, j]
                 ax.text(j, i, f"{val:{fmt}}", ha="center", va="center",
                         color="white" if val > data.max() * 0.6 else "black",
@@ -338,7 +384,7 @@ def fig_per_class_accuracy(true_labels: list[int], pred_labels: list[int]) -> No
 
     fig, ax = plt.subplots(figsize=(7, 4))
     colors = ["#2196F3", "#4CAF50", "#FF5722"]
-    bars = ax.bar(CROP_CLASSES, acc * 100, color=colors, edgecolor="white", width=0.5)
+    bars = ax.bar(CLASS_NAMES, acc * 100, color=colors, edgecolor="white", width=0.5)
     for bar, a in zip(bars, acc):
         ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.5,
                 f"{a*100:.1f}%", ha="center", va="bottom", fontsize=11)
@@ -384,7 +430,7 @@ def fig_sample_predictions(
         ax.imshow(img_np)
         color = "green" if true == pred else "red"
         ax.set_title(
-            f"True: {CROP_CLASSES[true]}\nPred: {CROP_CLASSES[pred]} ({conf:.0%})",
+            f"True: {CLASS_NAMES[true]}\nPred: {CLASS_NAMES[pred]} ({conf:.0%})",
             fontsize=8, color=color,
         )
         ax.axis("off")
@@ -402,8 +448,8 @@ def fig_sample_predictions(
 # ══════════════════════════════════════════════════════════════════════════════
 
 def train(args: argparse.Namespace) -> None:
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    RUN_DIR.mkdir(parents=True, exist_ok=True)
+    RUN_FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
     # ── Device ────────────────────────────────────────────────────────────────
     if torch.cuda.is_available():
@@ -452,9 +498,9 @@ def train(args: argparse.Namespace) -> None:
     # so they load cleanly on any single-GPU or MPS machine.
     if device.type == "cuda" and torch.cuda.device_count() > 1:
         model = nn.DataParallel(model)
-        print(f"Model: EfficientNet-B2  →  {NUM_CLASSES} classes  [{torch.cuda.device_count()}× DataParallel]")
+        print(f"Model: EfficientNet-B2  →  {len(CLASS_NAMES)} classes  [{torch.cuda.device_count()}× DataParallel]")
     else:
-        print(f"Model: EfficientNet-B2  →  {NUM_CLASSES} classes")
+        print(f"Model: EfficientNet-B2  →  {len(CLASS_NAMES)} classes")
 
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
     optimizer = optim.AdamW(model.parameters(), lr=args.lr,
@@ -518,7 +564,7 @@ def train(args: argparse.Namespace) -> None:
         torch.save({"epoch": epoch, "model": cpu_state,
                     "optimizer": optimizer.state_dict(),
                     "valid_acc": valid_acc},
-                   OUTPUT_DIR / "last.pth")
+                   RUN_DIR / "last.pth")
 
         # Save best checkpoint
         if valid_acc > best_valid_acc:
@@ -526,7 +572,7 @@ def train(args: argparse.Namespace) -> None:
             epochs_no_improve = 0
             torch.save({"epoch": epoch, "model": cpu_state,
                         "valid_acc": valid_acc},
-                       OUTPUT_DIR / "best.pth")
+                       RUN_DIR / "best.pth")
             print(f"        [OK] new best valid acc: {best_valid_acc*100:.2f}%")
         else:
             epochs_no_improve += 1
@@ -536,13 +582,13 @@ def train(args: argparse.Namespace) -> None:
                 break
 
     # Save metrics history
-    with (OUTPUT_DIR / "metrics_history.json").open("w") as f:
+    with (RUN_DIR / "metrics_history.json").open("w") as f:
         json.dump(history, f, indent=2)
-    print(f"\nMetrics saved → {OUTPUT_DIR / 'metrics_history.json'}")
+    print(f"\nMetrics saved → {RUN_DIR / 'metrics_history.json'}")
 
     # ── Final evaluation on test set ──────────────────────────────────────────
     print("\nLoading best checkpoint for test evaluation …")
-    ckpt = torch.load(OUTPUT_DIR / "best.pth", map_location=device,
+    ckpt = torch.load(RUN_DIR / "best.pth", map_location=device,
                       weights_only=True)
     model.load_state_dict(ckpt["model"])
 
@@ -551,7 +597,7 @@ def train(args: argparse.Namespace) -> None:
     )
     test_acc = sum(t == p for t, p in zip(true_labels, pred_labels)) / len(true_labels)
     print(f"\nTest Accuracy: {test_acc*100:.2f}%  (best epoch: {ckpt['epoch']})\n")
-    print(classification_report(true_labels, pred_labels, target_names=CROP_CLASSES))
+    print(classification_report(true_labels, pred_labels, target_names=CLASS_NAMES))
 
     # ── Figures ───────────────────────────────────────────────────────────────
     if not args.no_figures:
@@ -565,16 +611,16 @@ def train(args: argparse.Namespace) -> None:
 
 def figures_only(args: argparse.Namespace) -> None:
     """Regenerate all figures from an existing best.pth checkpoint."""
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    RUN_DIR.mkdir(parents=True, exist_ok=True)
+    RUN_FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
     device = torch.device("cpu")
-    ckpt   = torch.load(OUTPUT_DIR / "best.pth", map_location=device,
+    ckpt   = torch.load(RUN_DIR / "best.pth", map_location=device,
                         weights_only=True)
     model  = build_model().to(device)
     model.load_state_dict(ckpt["model"])
 
-    with (OUTPUT_DIR / "metrics_history.json").open() as f:
+    with (RUN_DIR / "metrics_history.json").open() as f:
         history = json.load(f)
 
     num_workers  = min(4, os.cpu_count() or 1)
@@ -690,9 +736,17 @@ def main() -> None:
                         help="Run 2 epochs to verify the setup")
     parser.add_argument("--figures-only", action="store_true",
                         help="Skip training; regenerate figures from best.pth")
+    parser.add_argument("--variant",     choices=sorted(VARIANTS), default="base",
+                        help="'base' = 3-class (Corn/Pepper/Tomato); "
+                             "'ood' = 4-class with a learned 'Other' class")
     parser.add_argument("--no-figures",  action="store_true",
                         help="Train without generating figures")
     args = parser.parse_args()
+
+    # Must happen before anything reads CLASS_NAMES / CSV_PREFIX / RUN_DIR.
+    apply_variant(args.variant)
+    print(f"Variant: {args.variant}  →  {len(CLASS_NAMES)} classes "
+          f"({', '.join(CLASS_NAMES)})  →  {RUN_DIR.name}/")
 
     if args.dry_run:
         args.epochs = 2
@@ -700,7 +754,7 @@ def main() -> None:
 
     # Validate CSVs exist
     for split in ("train", "valid", "test"):
-        csv = DATASET_DIR / f"classifier_{split}.csv"
+        csv = DATASET_DIR / f"{CSV_PREFIX}_{split}.csv"
         if not csv.exists():
             raise FileNotFoundError(
                 f"{csv} not found. Run  python generate_classifier_csv.py  first."
