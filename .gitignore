@@ -53,15 +53,14 @@ Thumbs.db
 # Datasets & Auto-Generated CSVs
 # See docs/07_dataset.md for dataset download instructions
 # =============================================================================
-data/main/train/
-data/main/valid/
-data/main/test/
-data/negatives/
-
-dataset/train/
-dataset/validate/
-dataset/test/
-dataset/classifier_*.csv
+# The whole data tree is ignored — images, labels, annotations and all.
+# Nothing under data/ is version-controlled, so keep your own backup of it:
+#   data/detector/final_*_labels.csv   bounding-box annotations for 58,361 images
+#   data/detector/label_map.json       class name -> integer label
+#   data/yolo/data.yaml                YOLO dataset config
+# These were tracked until 2026-08-04 and remain recoverable from git history:
+#   git show <commit>:data/detector/final_train_labels.csv > <path>
+data/
 
 # Auto-generated config (written by train.py at startup)
 data_fixed.yaml
@@ -93,3 +92,6 @@ logs/
 
 # RT-DETR generated data yaml
 data_rtdetr.yaml
+
+# Versioned weight snapshots (scripts/archive_weights.py) — large binaries
+weights/

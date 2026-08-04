@@ -1,8 +1,31 @@
 # Faster RCNN Ablation Study
 
-**Script:** `src/fasterrcnn/train_alt_fasterrcnn.py`  
+**Script:** `src/fasterrcnn/train_alt_faster_rcnn.py --mode ablation`  
 **Output directory:** `alt_fasterrcnn_output/`  
 **Role:** Systematic comparison of backbone depth, proposal count, NMS policy, and anchor scale to justify the final model architecture
+
+```bash
+python -m src.fasterrcnn.train_alt_faster_rcnn --mode ablation
+python -m src.fasterrcnn.train_alt_faster_rcnn --mode ablation --configs resnet50_300
+python -m src.fasterrcnn.train_alt_faster_rcnn --mode ablation --arch-figures
+```
+
+> **`--mode ablation` is required.** This study used to live in its own file,
+> `train_alt_fasterrcnn.py`; it now shares `train_alt_faster_rcnn.py` with the
+> [baseline](03_fasterrcnn_baseline.md), and `baseline` is the default mode. Omitting
+> `--mode ablation` silently runs the baseline instead.
+>
+> **The ablation's hyperparameters are `ABL_`-prefixed in the merged file** —
+> `ABL_EPOCHS_DEFAULT` (15), `ABL_PATIENCE` (5), `ABL_WARMUP_EPOCHS` (2),
+> `ABL_EVAL_EVERY` (3), `ABL_NUM_NEGATIVES` (100), `ABL_CLASS_NAMES`,
+> `ABL_MODELS_DIR`. The baseline uses the config defaults under the plain names.
+> This separation is deliberate: the two pipelines disagree on these values, and
+> sharing them would silently retrain one with the other's settings. If you add a
+> constant the two modes must not share, prefix it too.
+>
+> Checkpoint saving is also mode-specific: this study calls
+> **`save_ablation_checkpoint`**, whose signature leads with `config_id` because it
+> writes one checkpoint per configuration.
 
 ---
 
@@ -10,7 +33,7 @@
 
 Before committing to the SE-FPN final model, a structured ablation study was conducted to identify which architectural choices most affect detection performance on the Ghana Crop Disease dataset. The study mirrors the comparative analysis style of the original Faster RCNN paper (Ren et al., 2015) and produces paper-ready figures and a LaTeX table.
 
-Seven configurations are trained and evaluated under identical conditions (same optimizer, LR schedule, epoch budget, augmentation, and dataset). The results directly inform the architecture decisions made in `train_final.py`.
+Seven configurations are trained and evaluated under identical conditions (same optimizer, LR schedule, epoch budget, augmentation, and dataset). The results directly inform the architecture decisions made in `faster_rcnn_final.py`.
 
 ---
 
@@ -65,7 +88,7 @@ Default COCO anchor sizes (32–512 px) are tuned for general objects. Crop dise
 | Optimizer | SGD, momentum = 0.9 | Identical across all configs |
 | Learning rate | 5e-3 → cosine decay | Linear warmup for 2 epochs |
 | Gradient clip | 10.0 | |
-| Hard negatives | 100 images | Shared cache with `train_fasterrcnn.py` |
+| Hard negatives | 100 images | Shared cache with `train_alt_faster_rcnn.py --mode baseline` |
 | Eval frequency | Every 3 epochs | VOC mAP@0.5 |
 | Random seed | 42 | Fixed for reproducibility |
 | Speed benchmark | 100 runs, batch = 1 | Full model + backbone-only latency |
@@ -79,7 +102,7 @@ Default COCO anchor sizes (32–512 px) are tuned for general objects. Crop dise
 ### Architecture figures only (no training)
 
 ```bash
-python train_alt_fasterrcnn.py --arch-figures
+python train_alt_faster_rcnn.py --mode ablation --arch-figures
 ```
 
 This generates 5 architecture diagrams instantly to `alt_fasterrcnn_output/figures/` — no dataset or GPU required.
@@ -87,29 +110,29 @@ This generates 5 architecture diagrams instantly to `alt_fasterrcnn_output/figur
 ### Full ablation (all 7 configs)
 
 ```bash
-python train_alt_fasterrcnn.py --dry-run   # estimate total time first
-python train_alt_fasterrcnn.py             # train all 7 configs sequentially
+python train_alt_faster_rcnn.py --mode ablation --dry-run   # estimate total time first
+python train_alt_faster_rcnn.py --mode ablation             # train all 7 configs sequentially
 ```
 
 ### Single config
 
 ```bash
-python train_alt_fasterrcnn.py --configs resnet50_300
-python train_alt_fasterrcnn.py --configs resnet50_100 resnet50_1000
+python train_alt_faster_rcnn.py --mode ablation --configs resnet50_300
+python train_alt_faster_rcnn.py --mode ablation --configs resnet50_100 resnet50_1000
 ```
 
 ### All commands
 
 | Command | Purpose |
 |---|---|
-| `python train_alt_fasterrcnn.py` | Train all 7 configs |
-| `python train_alt_fasterrcnn.py --configs ID [ID …]` | Train specific config(s) |
-| `python train_alt_fasterrcnn.py --epochs 10` | Override epoch count per config |
-| `python train_alt_fasterrcnn.py --dry-run` | 2-epoch timing estimate per config |
-| `python train_alt_fasterrcnn.py --arch-figures` | Architecture diagrams only (instant) |
-| `python train_alt_fasterrcnn.py --figures-only` | All comparison figures from `results.json` |
-| `python train_alt_fasterrcnn.py --skip-negatives` | Reuse cached hard-negative images |
-| `python train_alt_fasterrcnn.py --no-figures` | Train without generating figures |
+| `python train_alt_faster_rcnn.py --mode ablation` | Train all 7 configs |
+| `python train_alt_faster_rcnn.py --mode ablation --configs ID [ID …]` | Train specific config(s) |
+| `python train_alt_faster_rcnn.py --mode ablation --epochs 10` | Override epoch count per config |
+| `python train_alt_faster_rcnn.py --mode ablation --dry-run` | 2-epoch timing estimate per config |
+| `python train_alt_faster_rcnn.py --mode ablation --arch-figures` | Architecture diagrams only (instant) |
+| `python train_alt_faster_rcnn.py --mode ablation --figures-only` | All comparison figures from `results.json` |
+| `python train_alt_faster_rcnn.py --mode ablation --skip-negatives` | Reuse cached hard-negative images |
+| `python train_alt_faster_rcnn.py --mode ablation --no-figures` | Train without generating figures |
 
 ---
 
@@ -131,7 +154,7 @@ To force a fresh run for one config:
 
 ```bash
 rm -rf alt_fasterrcnn_output/checkpoints/resnet101_300
-python train_alt_fasterrcnn.py --configs resnet101_300
+python train_alt_faster_rcnn.py --mode ablation --configs resnet101_300
 ```
 
 ---

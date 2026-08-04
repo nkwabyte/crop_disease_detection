@@ -59,9 +59,9 @@ This produces:
 
 | File | Images |
 |---|---|
-| `dataset/classifier_train.csv` | 2,861 |
-| `dataset/classifier_valid.csv` | 1,024 |
-| `dataset/classifier_test.csv` | 1,016 |
+| `data/yolo/classifier_train.csv` | 2,861 |
+| `data/yolo/classifier_valid.csv` | 1,024 |
+| `data/yolo/classifier_test.csv` | 1,016 |
 
 Images whose YOLO label files are missing or empty (hard-negative OOD images) are excluded — they carry no crop-type signal and would add noise to classification training.
 
@@ -125,7 +125,7 @@ DataLoader workers are kept alive across all epochs via `persistent_workers=True
 ### Prerequisites
 
 ```bash
-python generate_classifier_csv.py   # generates dataset/classifier_*.csv
+python generate_classifier_csv.py   # generates data/yolo/classifier_*.csv
 ```
 
 ### Full training run

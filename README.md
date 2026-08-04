@@ -9,12 +9,12 @@ Eight training scripts are provided:
 
 | Script | Purpose | Architecture | Output |
 | ------ | ------- | ------------ | ------ |
-| `src/classifier/generate_classifier_csv.py` | Build classifier CSVs | — | `dataset/classifier_*.csv` |
+| `src/classifier/generate_classifier_csv.py` | Build classifier CSVs | — | `data/yolo/classifier_*.csv` |
 | `src/classifier/train_classifier.py` | **Stage 1 — Crop classifier** | EfficientNet-B2 | `outputs/classifier_output/` |
 | `src/yolo/train.py` | Stage 2 — YOLO26 detector | YOLO26n (ultralytics) | `outputs/yolo_output/` |
-| `src/fasterrcnn/train_fasterrcnn.py` | Stage 2 — Faster RCNN baseline | ResNet-50-FPN-v2 | `outputs/fasterrcnn_output/` |
-| `src/fasterrcnn/train_alt_fasterrcnn.py` | Ablation study | 7 Faster RCNN variants | `outputs/alt_fasterrcnn_output/` |
-| `src/fasterrcnn/train_final.py` | Stage 2 — **SE-FPN final model** | ResNet-50-FPN-v2 + SE attention | `outputs/final_output/` |
+| `src/fasterrcnn/train_alt_faster_rcnn.py --mode baseline` | Stage 2 — Faster RCNN baseline | ResNet-50-FPN-v2 | `outputs/fasterrcnn_output/` |
+| `src/fasterrcnn/train_alt_faster_rcnn.py --mode ablation` | Ablation study | 7 Faster RCNN variants | `outputs/alt_fasterrcnn_output/` |
+| `src/fasterrcnn/faster_rcnn_final.py` | Stage 2 — **SE-FPN final model** | ResNet-50-FPN-v2 + SE attention | `outputs/final_output/` |
 | `src/vit/train_vit.py` | Stage 2 — **ViTDet detector** | ViT-B/16 backbone + Faster RCNN head | `outputs/vit_output/` |
 | `src/swin/train_swin.py` | Stage 2 — **Swin detector** | Swin-V2-T + FPN + Faster RCNN head | `outputs/swin_output/` |
 | `src/rtdetr/train_rtdetr.py` | Stage 2 — **RT-DETR detector** | RT-DETR-L (transformer query head) | `outputs/rtdetr_output/` |
@@ -58,6 +58,10 @@ Detailed documentation for each model is in the [`docs/`](docs/) folder:
 | [`docs/07_dataset.md`](docs/07_dataset.md) | Dataset — splits, class distribution, label conventions, citation |
 | [`docs/08_next_steps.md`](docs/08_next_steps.md) | Roadmap — additional models/experiments to strengthen the paper |
 | [`docs/09_gpu_server.md`](docs/09_gpu_server.md) | GPU server — setup, CUDA auto-scaling, training sweep, export |
+| [`docs/10_classifier_ood_adoption.md`](docs/10_classifier_ood_adoption.md) | Decision record — adopting the 4-class classifier with a learned `Other` class in the app |
+| [`docs/RENTING_GPU_WORKFLOW.md`](docs/RENTING_GPU_WORKFLOW.md) | Renting a monthly GPU — which tier, setup, data, checkpoints in and out |
+| [`scripts/README.md`](scripts/README.md) | Server connect/sync scripts, per-model training, measured performance |
+| [`scripts/export/README.md`](scripts/export/README.md) | ExecuTorch `.pte` conversion — run on your Mac, not the GPU box |
 
 ---
 
@@ -74,9 +78,9 @@ crop_disease_detection/
 │   │   ├── train.py           ← Stage 2: YOLO26 detector pipeline
 │   │   └── export_yolo.py     ← YOLO exporter
 │   ├── fasterrcnn/            ← Faster R-CNN models
-│   │   ├── train_fasterrcnn.py     ← Stage 2: Faster R-CNN v2 baseline
-│   │   ├── train_alt_fasterrcnn.py ← Faster R-CNN ablation study (7 configs)
-│   │   └── train_final.py          ← Stage 2: SE-FPN final model
+│   │   ├── train_alt_faster_rcnn.py ← Faster R-CNN v2 baseline (--mode baseline)
+│   │   │                              + 7-config ablation study (--mode ablation)
+│   │   └── faster_rcnn_final.py     ← Stage 2: SE-FPN final model
 │   ├── classifier/            ← Crop-type classifier
 │   │   ├── train_classifier.py     ← Stage 1: EfficientNet-B2 crop-type classifier
 │   │   ├── export_classifier.py    ← Classifier ExecuTorch/ONNX exporter
@@ -98,24 +102,28 @@ crop_disease_detection/
 │   ├── 06_two_stage_pipeline.md
 │   └── 07_dataset.md
 │
-├── data/                     ← YOLO dataset (Roboflow YOLO format)
-│   ├── main/
+├── data/                     ← All datasets live here
+│   ├── yolo/                 ← YOLO / RT-DETR format — also the classifier's source
 │   │   ├── train/            ← Training images + labels (hard negatives staged here)
 │   │   ├── valid/            ← Validation images + labels
-│   │   └── test/             ← Test images + labels
-│   └── negatives/            ← Shared hard-negative images (all pipelines)
-│
-├── dataset/                  ← Faster RCNN + classifier dataset
-│   ├── train/                ← Training images
-│   ├── validate/             ← Validation images
-│   ├── test/                 ← Test images
-│   ├── final_train_labels.csv
-│   ├── final_validate_labels.csv
-│   ├── final_test_labels.csv
-│   ├── classifier_train.csv  ← Crop-type classifier training split (2,861 images)
-│   ├── classifier_valid.csv  ← Crop-type classifier validation split (1,024 images)
-│   ├── classifier_test.csv   ← Crop-type classifier test split (1,016 images)
-│   └── label_map.json        ← Class name → integer label (1-indexed)
+│   │   ├── test/             ← Test images + labels
+│   │   ├── classifier_train.csv  ← Crop-type classifier training split (2,861 images)
+│   │   ├── classifier_valid.csv  ← Crop-type classifier validation split (1,024 images)
+│   │   └── classifier_test.csv   ← Crop-type classifier test split (1,016 images)
+│   │
+│   ├── detector/             ← Faster RCNN / ViT / Swin images, grouped by crop
+│   │   ├── train/{Corn,Pepper,Tomato}/     ← 40,852 images
+│   │   ├── validate/{Corn,Pepper,Tomato}/  ←  5,837 images
+│   │   ├── test/{Corn,Pepper,Tomato}/      ← 11,672 images
+│   │   ├── final_train_labels.csv          ← img_path points into the crop folders
+│   │   ├── final_validate_labels.csv
+│   │   ├── final_test_labels.csv
+│   │   └── label_map.json    ← Class name → integer label (1-indexed)
+│   │
+│   └── negatives/            ← Hard negatives (all pipelines) + non-target foliage
+│       ├── images/           ← Generic hard negatives for the detectors
+│       ├── ood/              ← Generic photographs for classifier rejection
+│       └── {eggplant,millet,potato,sorghum,tobacco}/  ← Near-miss crop leaves
 │
 ├── runs/
 │   └── crop_disease_yolo26/
@@ -190,12 +198,12 @@ python generate_classifier_csv.py
 python train_classifier.py
 ```
 
-Classifier CSVs are derived from the YOLO label files already in `data/main/`.
+Classifier CSVs are derived from the YOLO label files already in `data/yolo/`.
 Running `generate_classifier_csv.py` takes under a minute and produces:
 
-- `dataset/classifier_train.csv` (2,861 images)
-- `dataset/classifier_valid.csv` (1,024 images)
-- `dataset/classifier_test.csv` (1,016 images)
+- `data/yolo/classifier_train.csv` (2,861 images)
+- `data/yolo/classifier_valid.csv` (1,024 images)
+- `data/yolo/classifier_test.csv` (1,016 images)
 
 Hard-negative images (empty `.txt` labels, no crop assignment) are excluded
 automatically.
@@ -378,11 +386,68 @@ python train.py
 
 ---
 
-## Faster RCNN v2 Pipeline — `train_fasterrcnn.py`
+## `train_alt_faster_rcnn.py` — one file, two pipelines
+
+The Faster R-CNN baseline and the 7-configuration ablation study live in a single
+module, selected with `--mode`. They were separate files (`train_fasterrcnn.py` and
+`train_alt_fasterrcnn.py`) until they were merged.
+
+```bash
+# the production baseline — one model, figures, mobile export
+python -m src.fasterrcnn.train_alt_faster_rcnn --mode baseline
+python -m src.fasterrcnn.train_alt_faster_rcnn --mode baseline --dry-run
+
+# the ablation study — 7 configurations compared
+python -m src.fasterrcnn.train_alt_faster_rcnn --mode ablation
+python -m src.fasterrcnn.train_alt_faster_rcnn --mode ablation --configs resnet50_300
+```
+
+`--mode` is stripped before each pipeline's own argument parser runs, so every flag
+either pipeline accepted before the merge still works unchanged. **`--mode baseline`
+is the default**, so an invocation with no mode behaves exactly as the old
+`train_fasterrcnn.py` did.
+
+| | `--mode baseline` | `--mode ablation` |
+| --- | ----------------- | ----------------- |
+| Trains | 1 model (ResNet50-FPN-v2) | 7 configurations |
+| Output | `outputs/fasterrcnn_output/` | `outputs/alt_fasterrcnn_output/` |
+| Epochs | 30 (config default) | 15 (`ABL_EPOCHS_DEFAULT`) |
+| Patience / warmup | config | 5 / 2 (`ABL_*`) |
+| Hard negatives | config | 100 (`ABL_NUM_NEGATIVES`) |
+| Mixed precision | yes, on CUDA | no |
+| Exports mobile artifacts | yes | no — it is a comparison, not a deliverable |
+
+### Why the ablation's constants are `ABL_`-prefixed
+
+**This is the part to preserve when editing the file.** The two pipelines genuinely
+disagree on their hyperparameters — the ablation deliberately trains shorter (15
+epochs, patience 5, 100 negatives) because it is a *comparative* study, while the
+baseline uses the full config defaults. If both used the plain names, one pipeline
+would silently inherit the other's settings: no error, just wrong numbers.
+
+So every ablation-side value is prefixed — `ABL_EPOCHS_DEFAULT`, `ABL_PATIENCE`,
+`ABL_WARMUP_EPOCHS`, `ABL_EVAL_EVERY`, `ABL_NUM_NEGATIVES`, `ABL_CLASS_NAMES`,
+`ABL_MODELS_DIR` — and ablation code refers only to the prefixed names. **If you add
+a constant that the two modes should not share, prefix it too.**
+
+### What is shared, and what is not
+
+The dataset, transforms, evaluation, scheduler and checkpoint helpers are defined
+once, using the baseline's implementations. `train_one_epoch` takes an optional
+`GradScaler` that defaults to `None`, which is why the baseline gets AMP on CUDA and
+the ablation does not — the ablation simply does not pass one.
+
+The one helper that is *not* shared is `save_checkpoint`: the ablation's signature
+leads with `config_id` because it writes per-configuration checkpoints, so it lives
+alongside as **`save_ablation_checkpoint`**.
+
+---
+
+## Faster RCNN v2 Pipeline — `train_alt_faster_rcnn.py --mode baseline`
 
 Upgraded from `detector-torch.ipynb` with the following changes:
 
-| Before (notebook) | After (`train_fasterrcnn.py`) |
+| Before (notebook) | After (`train_alt_faster_rcnn.py --mode baseline`) |
 | ----------------- | ----------------------------- |
 | `fasterrcnn_resnet50_fpn` v1 | `fasterrcnn_resnet50_fpn_v2` (COCO AP 37.0 → 46.7) |
 | `num_classes=23` (bug — missing background) | `num_classes=24` (23 diseases + class 0 background) |
@@ -398,7 +463,7 @@ Upgraded from `detector-torch.ipynb` with the following changes:
 ### Quick start (Faster RCNN)
 
 ```bash
-python train_fasterrcnn.py
+python train_alt_faster_rcnn.py --mode baseline
 ```
 
 This runs four steps automatically:
@@ -412,14 +477,14 @@ This runs four steps automatically:
 
 | Command | When to use |
 | ------- | ----------- |
-| `python train_fasterrcnn.py` | Full pipeline from scratch |
-| `python train_fasterrcnn.py --dry-run` | Estimate training time (2 epochs) |
-| `python train_fasterrcnn.py --skip-negatives` | Negatives already downloaded |
-| `python train_fasterrcnn.py --figures-only` | Regenerate publication figures only |
-| `python train_fasterrcnn.py --export-only` | Re-export best checkpoint to mobile formats |
-| `python train_fasterrcnn.py --no-figures` | Train without generating figures |
-| `python train_fasterrcnn.py --epochs 10` | Override epoch count |
-| `DRY_RUN=1 python train_fasterrcnn.py` | Dry-run via environment variable |
+| `python train_alt_faster_rcnn.py --mode baseline` | Full pipeline from scratch |
+| `python train_alt_faster_rcnn.py --mode baseline --dry-run` | Estimate training time (2 epochs) |
+| `python train_alt_faster_rcnn.py --mode baseline --skip-negatives` | Negatives already downloaded |
+| `python train_alt_faster_rcnn.py --mode baseline --figures-only` | Regenerate publication figures only |
+| `python train_alt_faster_rcnn.py --mode baseline --export-only` | Re-export best checkpoint to mobile formats |
+| `python train_alt_faster_rcnn.py --mode baseline --no-figures` | Train without generating figures |
+| `python train_alt_faster_rcnn.py --mode baseline --epochs 10` | Override epoch count |
+| `DRY_RUN=1 python train_alt_faster_rcnn.py --mode baseline` | Dry-run via environment variable |
 
 ### Resume after interruption (Faster RCNN)
 
@@ -427,8 +492,8 @@ Training saves `outputs/fasterrcnn_output/checkpoints/last.pth` after every epoc
 Re-running the same command resumes automatically:
 
 ```bash
-python train_fasterrcnn.py              # detects last.pth → resumes
-python train_fasterrcnn.py --skip-negatives   # if negatives are already staged
+python train_alt_faster_rcnn.py --mode baseline              # detects last.pth → resumes
+python train_alt_faster_rcnn.py --mode baseline --skip-negatives   # if negatives are already staged
 ```
 
 The checkpoint stores epoch number, model weights, optimizer state, scheduler
@@ -438,7 +503,7 @@ To force a fresh start:
 
 ```bash
 rm -rf outputs/fasterrcnn_output/checkpoints
-python train_fasterrcnn.py
+python train_alt_faster_rcnn.py --mode baseline
 ```
 
 ### Training configuration
@@ -476,12 +541,12 @@ After training, three formats are exported to `outputs/fasterrcnn_output/models/
 Re-export at any time without re-training:
 
 ```bash
-python train_fasterrcnn.py --export-only
+python train_alt_faster_rcnn.py --mode baseline --export-only
 ```
 
 ---
 
-## Faster RCNN Ablation Study — `train_alt_fasterrcnn.py`
+## Faster RCNN Ablation Study — `train_alt_faster_rcnn.py --mode ablation`
 
 Mirrors the comparative analysis style of the original Faster RCNN paper (Ren et al., 2015)
 to justify the final model selection for publication. Trains and evaluates 7 configurations
@@ -503,33 +568,33 @@ across backbone depth, RPN proposal count, NMS policy, and anchor scale.
 
 ```bash
 # Architecture figures (no training needed — useful for paper diagrams)
-python train_alt_fasterrcnn.py --arch-figures
+python train_alt_faster_rcnn.py --mode ablation --arch-figures
 
 # Train all 7 configurations sequentially
-python train_alt_fasterrcnn.py
+python train_alt_faster_rcnn.py --mode ablation
 
 # Train a single configuration (e.g. the selected baseline)
-python train_alt_fasterrcnn.py --configs resnet50_300
+python train_alt_faster_rcnn.py --mode ablation --configs resnet50_300
 
 # Quick timing estimate (2 epochs per config)
-python train_alt_fasterrcnn.py --dry-run
+python train_alt_faster_rcnn.py --mode ablation --dry-run
 
 # Regenerate all figures from existing results.json
-python train_alt_fasterrcnn.py --figures-only
+python train_alt_faster_rcnn.py --mode ablation --figures-only
 ```
 
 ### All commands (Ablation)
 
 | Command | When to use |
 | ------- | ----------- |
-| `python train_alt_fasterrcnn.py` | Train all 7 configs |
-| `python train_alt_fasterrcnn.py --configs ID [ID ...]` | Train specific config(s) |
-| `python train_alt_fasterrcnn.py --epochs 10` | Override epoch count per config |
-| `python train_alt_fasterrcnn.py --dry-run` | 2-epoch timing estimate per config |
-| `python train_alt_fasterrcnn.py --arch-figures` | Architecture diagrams only (instant) |
-| `python train_alt_fasterrcnn.py --figures-only` | All figures from existing results.json |
-| `python train_alt_fasterrcnn.py --skip-negatives` | Reuse cached hard-negative images |
-| `python train_alt_fasterrcnn.py --no-figures` | Train without generating figures |
+| `python train_alt_faster_rcnn.py --mode ablation` | Train all 7 configs |
+| `python train_alt_faster_rcnn.py --mode ablation --configs ID [ID ...]` | Train specific config(s) |
+| `python train_alt_faster_rcnn.py --mode ablation --epochs 10` | Override epoch count per config |
+| `python train_alt_faster_rcnn.py --mode ablation --dry-run` | 2-epoch timing estimate per config |
+| `python train_alt_faster_rcnn.py --mode ablation --arch-figures` | Architecture diagrams only (instant) |
+| `python train_alt_faster_rcnn.py --mode ablation --figures-only` | All figures from existing results.json |
+| `python train_alt_faster_rcnn.py --mode ablation --skip-negatives` | Reuse cached hard-negative images |
+| `python train_alt_faster_rcnn.py --mode ablation --no-figures` | Train without generating figures |
 
 ### Resume after interruption (Ablation)
 
@@ -538,15 +603,15 @@ Each configuration saves its own checkpoint to
 resumes each config from where it left off automatically.
 
 ```bash
-python train_alt_fasterrcnn.py          # resumes each unfinished config
-python train_alt_fasterrcnn.py --configs resnet101_300   # resume one config
+python train_alt_faster_rcnn.py --mode ablation          # resumes each unfinished config
+python train_alt_faster_rcnn.py --mode ablation --configs resnet101_300   # resume one config
 ```
 
 To force a fresh start for a specific config:
 
 ```bash
 rm -rf outputs/alt_fasterrcnn_output/checkpoints/resnet101_300
-python train_alt_fasterrcnn.py --configs resnet101_300
+python train_alt_faster_rcnn.py --mode ablation --configs resnet101_300
 ```
 
 ### Training configuration (Ablation)
@@ -559,7 +624,7 @@ python train_alt_fasterrcnn.py --configs resnet101_300
 | Optimizer | SGD (momentum = 0.9) | Identical across all configs for fair comparison |
 | Learning rate | 5e-3 → cosine decay | Linear warmup for 2 epochs |
 | Gradient clip | 10.0 | |
-| Hard negatives | 100 images | Shared cache with `train_fasterrcnn.py` |
+| Hard negatives | 100 images | Shared cache with `train_alt_faster_rcnn.py --mode baseline` |
 | Eval frequency | Every 3 epochs | VOC mAP@0.5 |
 | Speed benchmark | 100 runs, batch=1 | Full model + backbone-only latency |
 | Seed | 42 | Fixed across all configs |
@@ -594,7 +659,7 @@ python train_alt_fasterrcnn.py --configs resnet101_300
 
 ---
 
-## Final SE-FPN Model — `train_final.py`
+## Final SE-FPN Model — `faster_rcnn_final.py`
 
 The primary research contribution of this project. Builds on the Faster RCNN v2 baseline
 with eight custom innovations designed to maximise per-class AP on the Ghana Crop Disease
@@ -617,7 +682,7 @@ ablation study baseline.
 ### Quick start (Final model)
 
 ```bash
-python train_final.py
+python faster_rcnn_final.py
 ```
 
 This runs four steps automatically:
@@ -631,16 +696,16 @@ This runs four steps automatically:
 
 | Command | When to use |
 | ------- | ----------- |
-| `python train_final.py` | Full 4-step pipeline from scratch |
-| `python train_final.py --dry-run` | 2-epoch timing estimate |
-| `python train_final.py --skip-negatives` | Negatives already downloaded |
-| `python train_final.py --figures-only` | Regenerate all figures from `best.pth` |
-| `python train_final.py --export-only` | Re-export best checkpoint to mobile formats |
-| `python train_final.py --no-figures` | Train without generating figures |
-| `python train_final.py --no-ema` | Disable EMA (faster iteration, lower mAP) |
-| `python train_final.py --no-tta` | Disable TTA at final evaluation |
-| `python train_final.py --epochs 60` | Override epoch count |
-| `DRY_RUN=1 python train_final.py` | Dry-run via environment variable |
+| `python faster_rcnn_final.py` | Full 4-step pipeline from scratch |
+| `python faster_rcnn_final.py --dry-run` | 2-epoch timing estimate |
+| `python faster_rcnn_final.py --skip-negatives` | Negatives already downloaded |
+| `python faster_rcnn_final.py --figures-only` | Regenerate all figures from `best.pth` |
+| `python faster_rcnn_final.py --export-only` | Re-export best checkpoint to mobile formats |
+| `python faster_rcnn_final.py --no-figures` | Train without generating figures |
+| `python faster_rcnn_final.py --no-ema` | Disable EMA (faster iteration, lower mAP) |
+| `python faster_rcnn_final.py --no-tta` | Disable TTA at final evaluation |
+| `python faster_rcnn_final.py --epochs 60` | Override epoch count |
+| `DRY_RUN=1 python faster_rcnn_final.py` | Dry-run via environment variable |
 
 ### Resume after interruption (Final model)
 
@@ -649,15 +714,15 @@ the EMA shadow weights and SGDR scheduler state. Re-running the same command
 resumes automatically:
 
 ```bash
-python train_final.py              # detects last.pth → resumes
-python train_final.py --skip-negatives   # if negatives are already staged
+python faster_rcnn_final.py              # detects last.pth → resumes
+python faster_rcnn_final.py --skip-negatives   # if negatives are already staged
 ```
 
 To force a fresh start:
 
 ```bash
 rm -rf outputs/final_output/checkpoints
-python train_final.py
+python faster_rcnn_final.py
 ```
 
 ### Final model — training configuration
@@ -697,7 +762,7 @@ After training, four formats are exported to `outputs/final_output/models/`:
 Re-export at any time without re-training:
 
 ```bash
-python train_final.py --export-only
+python faster_rcnn_final.py --export-only
 ```
 
 ### Final model — generated figures
@@ -891,7 +956,7 @@ matrix (CNN/Transformer **backbone** × region/query **head**).
 Because RT-DETR inference is static-shape (fixed object queries, no NMS), it is the
 most **ExecuTorch-friendly full model** of the transformer detectors — it can export
 as a single end-to-end `.pte` the app consumes directly, exactly like YOLO26. It trains
-on the same YOLO-format `data/main/` dataset with the same 0-indexed class order.
+on the same YOLO-format `data/yolo/` dataset with the same 0-indexed class order.
 
 ### Quick start (RT-DETR)
 
@@ -938,7 +1003,7 @@ Generated by `python train.py` or `python train.py --figures-only`.
 
 ### Faster RCNN v2 — `outputs/fasterrcnn_output/`
 
-Generated by `python train_fasterrcnn.py` or `python train_fasterrcnn.py --figures-only`.
+Generated by `python train_alt_faster_rcnn.py --mode baseline` or `python train_alt_faster_rcnn.py --mode baseline --figures-only`.
 
 | File | Contents |
 | ---- | -------- |
@@ -956,7 +1021,7 @@ Generated by `python train_fasterrcnn.py` or `python train_fasterrcnn.py --figur
 
 ### SE-FPN Final model — `outputs/final_output/`
 
-Generated by `python train_final.py` or `python train_final.py --figures-only`.
+Generated by `python faster_rcnn_final.py` or `python faster_rcnn_final.py --figures-only`.
 
 | File | Contents |
 | ---- | -------- |
@@ -1080,7 +1145,7 @@ The table below is the authoritative cross-reference. Rows are ordered by YOLO i
 > **Label indexing note:** YOLO uses 0-indexed labels in the order defined by
 > `src/yolo/config.py` / `data_fixed.yaml` (alphabetical within crop). Faster RCNN
 > reserves 0 for background and uses 1-indexed labels in the order defined by
-> `dataset/label_map.json` (which matches the `integer_label` column of the
+> `data/detector/label_map.json` (which matches the `integer_label` column of the
 > annotation CSVs the model actually trains on). The two orderings differ, so always
 > use the table above to map between them — never assume a fixed offset.
 
@@ -1211,7 +1276,7 @@ the baseline Faster RCNN uses up to 200).
 | `detector-torch.ipynb` | Original Faster RCNN notebook (reference) | Faster RCNN |
 
 > `detector-torch.ipynb` is kept as a reference. All improvements it required
-> are implemented in `train_fasterrcnn.py`. Run `train_fasterrcnn.py` instead.
+> are implemented in `train_alt_faster_rcnn.py --mode baseline`. Run `train_alt_faster_rcnn.py --mode baseline` instead.
 
 ---
 
@@ -1241,34 +1306,34 @@ jupyter notebook export.ipynb   # export to mobile
 ### First time — Faster RCNN v2
 
 ```bash
-python train_fasterrcnn.py --dry-run        # estimate time
-python train_fasterrcnn.py                  # full run
+python train_alt_faster_rcnn.py --mode baseline --dry-run        # estimate time
+python train_alt_faster_rcnn.py --mode baseline                  # full run
 open outputs/fasterrcnn_output/                     # inspect figures
-python train_fasterrcnn.py --export-only    # re-export if needed
+python train_alt_faster_rcnn.py --mode baseline --export-only    # re-export if needed
 ```
 
 ### Ablation study (for paper)
 
 ```bash
 # Step 1: generate architecture diagrams immediately (no training needed)
-python train_alt_fasterrcnn.py --arch-figures
+python train_alt_faster_rcnn.py --mode ablation --arch-figures
 
 # Step 2: run full ablation (trains all 7 configs sequentially, ~7× longer)
-python train_alt_fasterrcnn.py --dry-run    # estimate time first
-python train_alt_fasterrcnn.py              # full run
+python train_alt_faster_rcnn.py --mode ablation --dry-run    # estimate time first
+python train_alt_faster_rcnn.py --mode ablation              # full run
 
 # Step 3: inspect results and regenerate figures
 open outputs/alt_fasterrcnn_output/figures/
-python train_alt_fasterrcnn.py --figures-only   # if you want to tweak figures
+python train_alt_faster_rcnn.py --mode ablation --figures-only   # if you want to tweak figures
 ```
 
 ### First time — SE-FPN final model
 
 ```bash
-python train_final.py --dry-run         # estimate time
-python train_final.py                   # full run (50 epochs, EMA, SGDR)
+python faster_rcnn_final.py --dry-run         # estimate time
+python faster_rcnn_final.py                   # full run (50 epochs, EMA, SGDR)
 open outputs/final_output/                      # inspect all 15 figures
-python train_final.py --export-only     # re-export mobile models if needed
+python faster_rcnn_final.py --export-only     # re-export mobile models if needed
 ```
 
 ### After interruption
@@ -1276,21 +1341,21 @@ python train_final.py --export-only     # re-export mobile models if needed
 ```bash
 python train_classifier.py        # Classifier — auto-resumes from last.pth
 python train.py                   # YOLO — auto-resumes from last.pt
-python train_fasterrcnn.py        # Faster RCNN baseline — auto-resumes from last.pth
-python train_final.py             # SE-FPN final — auto-resumes (EMA + scheduler state saved)
+python train_alt_faster_rcnn.py --mode baseline        # Faster RCNN baseline — auto-resumes from last.pth
+python faster_rcnn_final.py             # SE-FPN final — auto-resumes (EMA + scheduler state saved)
 ```
 
 ---
 
 ## Dataset
 
-**YOLO pipeline** (`data/main/`):
+**YOLO pipeline** (`data/yolo/`):
 
 - Format: YOLO `.txt` labels (one file per image, normalised XYWH)
 - Source: [Ghana Crop Disease Challenge v2](https://universe.roboflow.com/ghanacropdiseasechallenge/ghana-crop-disease-challenge/dataset/2) — Roboflow, CC BY 4.0
 - Splits: train / valid / test (Roboflow auto-split)
 
-**Faster RCNN pipeline** (`dataset/`):
+**Faster RCNN pipeline** (`data/detector/`):
 
 - Format: CSV annotations with absolute pixel XYXY bounding boxes
 - `integer_label` values match `label_map.json` (1-indexed, 1 = Corn Cercospora … 23 = Tomato Mosaic)

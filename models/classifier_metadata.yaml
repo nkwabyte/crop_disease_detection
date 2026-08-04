@@ -1,7 +1,7 @@
-model_name: crop_classifier_effnet_b2
+model_name: crop_classifier_effnet_b2_base
 architecture: EfficientNet-B2
 task: image_classification
-exported_at: '2026-06-07T19:21:36.283400Z'
+exported_at: '2026-08-04T15:19:56.631515Z'
 input_size: 260
 input_channels: 3
 num_classes: 3
@@ -10,6 +10,7 @@ class_names:
 - Pepper
 - Tomato
 conf_threshold: 0.55
+rejection: softmax confidence below conf_threshold -> unknown
 android_integration:
   runtime: ExecuTorch
   backend: XNNPACK

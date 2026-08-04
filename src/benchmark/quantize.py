@@ -211,7 +211,7 @@ def _quantize_detector_backbone(pkg: str, out_name: str, tag: str, n_calib: int)
     ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
     model.load_state_dict(ckpt["model_state_dict"])
     backbone = mod._BackboneWrapper(model.backbone).eval()
-    calib = _calib_inputs(cfg.PROJECT_ROOT / "data" / "main" / "train" / "images",
+    calib = _calib_inputs(cfg.PROJECT_ROOT / "data" / "yolo" / "train" / "images",
                           cfg.IMG_SIZE, n_calib)
     ex = (torch.zeros(1, 3, cfg.IMG_SIZE, cfg.IMG_SIZE),)
     out = cfg.MODELS_DIR / out_name
@@ -219,7 +219,7 @@ def _quantize_detector_backbone(pkg: str, out_name: str, tag: str, n_calib: int)
     fp32 = cfg.MODELS_DIR / out_name.replace("_int8", "")
     _report(tag, fp32, out, size)
     _warn_if_low(tag, _backbone_fidelity(backbone, out,
-                 cfg.PROJECT_ROOT / "data" / "main" / "train" / "images", cfg.IMG_SIZE),
+                 cfg.PROJECT_ROOT / "data" / "yolo" / "train" / "images", cfg.IMG_SIZE),
                  "feature-cosine")
 
 

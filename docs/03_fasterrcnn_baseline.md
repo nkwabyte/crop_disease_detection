@@ -1,8 +1,20 @@
 # Faster RCNN v2 Baseline Detector
 
-**Script:** `src/fasterrcnn/train_fasterrcnn.py`  
+**Script:** `src/fasterrcnn/train_alt_faster_rcnn.py --mode baseline`  
 **Output directory:** `fasterrcnn_output/`  
 **Role:** Two-stage detection baseline; reference point for SE-FPN ablation
+
+```bash
+python -m src.fasterrcnn.train_alt_faster_rcnn --mode baseline
+python -m src.fasterrcnn.train_alt_faster_rcnn --mode baseline --dry-run
+```
+
+> This pipeline used to live in its own file, `train_fasterrcnn.py`. It now shares
+> `train_alt_faster_rcnn.py` with the [ablation study](04_fasterrcnn_ablation.md),
+> selected by `--mode`. `baseline` is the default, so an invocation with no mode
+> behaves exactly as the old script did, and every flag it accepted still works.
+> The two modes keep separate hyperparameters and output directories — see
+> [the README](../README.md#train_alt_faster_rcnnpy--one-file-two-pipelines).
 
 ---
 
@@ -12,7 +24,7 @@ This script implements a clean, production-quality fine-tuning pipeline for `fas
 
 It supersedes the original `detector-torch.ipynb` notebook with the following corrections and additions:
 
-| Issue in notebook | Fix in `train_fasterrcnn.py` |
+| Issue in notebook | Fix in `train_alt_faster_rcnn.py --mode baseline` |
 |---|---|
 | `fasterrcnn_resnet50_fpn` (v1, COCO AP 37.0) | `fasterrcnn_resnet50_fpn_v2` (COCO AP 46.7) |
 | `num_classes=23` — missing background class | `num_classes=24` — 23 diseases (1–23) + background (0) |
@@ -141,15 +153,15 @@ On MPS, AMP is skipped and the model trains in float32. MPS fp16 detection losse
 A checkpoint is saved after every epoch to `fasterrcnn_output/checkpoints/last.pth`. It stores epoch number, model weights, optimizer state, scheduler state, and best mAP. Re-running the same command resumes automatically:
 
 ```bash
-python train_fasterrcnn.py              # detects last.pth → resumes
-python train_fasterrcnn.py --skip-negatives   # if negatives already staged
+python train_alt_faster_rcnn.py --mode baseline              # detects last.pth → resumes
+python train_alt_faster_rcnn.py --mode baseline --skip-negatives   # if negatives already staged
 ```
 
 To force a fresh start:
 
 ```bash
 rm -rf fasterrcnn_output/checkpoints
-python train_fasterrcnn.py
+python train_alt_faster_rcnn.py --mode baseline
 ```
 
 ---
@@ -158,14 +170,14 @@ python train_fasterrcnn.py
 
 | Command | Purpose |
 |---|---|
-| `python train_fasterrcnn.py` | Full pipeline from scratch |
-| `python train_fasterrcnn.py --dry-run` | 2-epoch timing estimate |
-| `python train_fasterrcnn.py --skip-negatives` | Skip hard-negative download |
-| `python train_fasterrcnn.py --figures-only` | Regenerate figures from `best.pth` |
-| `python train_fasterrcnn.py --export-only` | Re-export mobile models from `best.pth` |
-| `python train_fasterrcnn.py --no-figures` | Train without generating figures |
-| `python train_fasterrcnn.py --epochs 15` | Override epoch count |
-| `DRY_RUN=1 python train_fasterrcnn.py` | Dry-run via environment variable |
+| `python train_alt_faster_rcnn.py --mode baseline` | Full pipeline from scratch |
+| `python train_alt_faster_rcnn.py --mode baseline --dry-run` | 2-epoch timing estimate |
+| `python train_alt_faster_rcnn.py --mode baseline --skip-negatives` | Skip hard-negative download |
+| `python train_alt_faster_rcnn.py --mode baseline --figures-only` | Regenerate figures from `best.pth` |
+| `python train_alt_faster_rcnn.py --mode baseline --export-only` | Re-export mobile models from `best.pth` |
+| `python train_alt_faster_rcnn.py --mode baseline --no-figures` | Train without generating figures |
+| `python train_alt_faster_rcnn.py --mode baseline --epochs 15` | Override epoch count |
+| `DRY_RUN=1 python train_alt_faster_rcnn.py --mode baseline` | Dry-run via environment variable |
 
 ---
 
@@ -184,7 +196,7 @@ After training, the best checkpoint is exported to `fasterrcnn_output/models/`:
 Re-export at any time:
 
 ```bash
-python train_fasterrcnn.py --export-only
+python train_alt_faster_rcnn.py --mode baseline --export-only
 ```
 
 ---

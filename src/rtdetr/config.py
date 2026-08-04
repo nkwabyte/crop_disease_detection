@@ -4,14 +4,14 @@ Self-contained — duplicates the YOLO-format data + class-name conventions rath
 importing from src/yolo, so the package stays decoupled.
 
 RT-DETR is a query-based transformer detector (no anchors, no NMS). It trains on the
-same YOLO-format dataset (data/main/) with the same 0-indexed class order as YOLO26.
+same YOLO-format dataset (data/yolo/) with the same 0-indexed class order as YOLO26.
 """
 
 from pathlib import Path
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-DATA_DIR     = PROJECT_ROOT / "data" / "main"
+DATA_DIR     = PROJECT_ROOT / "data" / "yolo"
 NEG_DIR      = PROJECT_ROOT / "data" / "negatives"
 RTDETR_YAML  = PROJECT_ROOT / "data_rtdetr.yaml"     # generated at train time
 RUNS_DIR     = PROJECT_ROOT / "outputs" / "rtdetr_output"
