@@ -216,21 +216,25 @@ def _patch_tal_for_mps() -> None:
     print("  MPS TAL patch applied (assigner runs on CPU to avoid boolean-index bug)")
 
 
-def resolve_device() -> tuple:
+def resolve_device(batch_override: int = None) -> tuple:
     """Return (device, total_batch, use_amp) for the current hardware.
 
     AMP is disabled on MPS: fp16 precision corrupts index tensors inside the
     TAL assigner, causing `torch.AcceleratorError: index N is out of bounds`
     around epoch 5.  CUDA and CPU are unaffected.
+
+    `batch_override` is the per-GPU batch size from --batch-size; the CUDA
+    defaults assume a 96 GB card, so smaller GPUs need it lowered.
     """
     if torch.cuda.is_available():
         n = torch.cuda.device_count()
+        per_gpu = batch_override or CUDA_BATCH
         if n > 1:
-            return list(range(n)), CUDA_BATCH * n, True   # multi-GPU DDP
-        return 0, CUDA_BATCH, True
+            return list(range(n)), per_gpu * n, True   # multi-GPU DDP
+        return 0, per_gpu, True
     if torch.backends.mps.is_available():
-        return "mps", BASE_BATCH, False   # AMP off — MPS fp16 index bug
-    return "cpu", BASE_BATCH, False
+        return "mps", batch_override or BASE_BATCH, False   # AMP off — MPS fp16 index bug
+    return "cpu", batch_override or BASE_BATCH, False
 
 
 def log_startup(device, batch, n_train, n_val, model_tag, epochs, dry_run, use_amp):
@@ -802,6 +806,9 @@ Examples:
                         help="Run 1 epoch; print epoch-time estimate")
     parser.add_argument("--epochs",         type=int, default=None,
                         help=f"Override epoch count (default: {EPOCHS_DEFAULT})")
+    parser.add_argument("--batch-size",     type=int, default=None,
+                        help=f"Per-GPU batch size (default: {CUDA_BATCH} on CUDA, "
+                             f"{BASE_BATCH} on MPS/CPU)")
     parser.add_argument("--skip-negatives", action="store_true",
                         help="Skip hard-negative download/staging")
     parser.add_argument("--figures-only",   action="store_true",
@@ -839,7 +846,7 @@ Examples:
 
     # ── Step 3: Train ─────────────────────────────────────────────────────────
     print("\n─── Step 3/3: Training ──────────────────────────────────────────")
-    device, batch, use_amp = resolve_device()
+    device, batch, use_amp = resolve_device(args.batch_size)
     is_mps   = device == "mps"
     is_multi = isinstance(device, list)
 
