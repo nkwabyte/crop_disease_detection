@@ -164,25 +164,45 @@ RTX 5090 (31.4 GB), 32 cores, on a 10 % subset (4,076 train / 573 val), 2 epochs
 Extrapolated to the full 40,852-image train split (×10.02), ViT at batch 16 runs about
 **16.5 min/epoch, ~11 h for 40 epochs**; at batch 4 it is ~21 min/epoch, ~14 h.
 
-### Training is input-bound, not compute-bound
+### The workload is GPU-bound, and the dataloader is not the limit
 
-The clearest evidence: the *unfrozen* ViT run was **faster** than the frozen one (4.2 vs
-5.0 min). Backpropagating through the backbone cannot be cheaper than skipping it — the
-difference is page cache, since the first run read every image cold from disk. GPU
-utilisation swinging 11 %→99 % and power drawing ~270 W of a 575 W TDP say the same thing.
+An earlier revision of this file claimed training was input-bound, inferred from GPU
+utilisation swinging 11 %→99 % and from the *unfrozen* ViT run finishing faster than the
+frozen one (4.2 vs 5.0 min). **That conclusion was wrong.** The frozen/unfrozen anomaly is
+real but only reflects page cache on the first cold pass; low average utilisation on its
+own does not identify the bottleneck.
 
-So the GPU idles a large fraction of the time, and buying a faster one buys little. The
-levers that would actually help, in order:
+Measured directly instead — synthetic batches straight on the GPU, no dataloader at all:
 
-1. **Dataloader workers.** Every trainer caps them at `min(16, cpu_count)` — on this
-   32-core box, half the cores sit idle. Raising the cap is a one-line change.
-2. **Prefetch depth.** The loaders set `pin_memory` and `persistent_workers` but leave
-   `prefetch_factor` at the default 2.
-3. **Decode cost.** Images are already 640×640, so workers spend their time on JPEG decode.
-   Decoding on the GPU (DALI / `nvjpeg`) or caching decoded tensors would remove it.
+| Batch | GPU-only img/s | Peak GB |
+| ----- | -------------- | ------- |
+| 4 | 43.1 | 3.60 |
+| 8 | 61.7 | 5.85 |
+| 16 | 63.2 | 10.32 |
+| 24 | 64.1 | 14.71 |
 
-Batch size is *not* the main lever: 4×-ing it only bought 1.27× throughput, exactly what
-you would expect when the GPU is waiting on input.
+End-to-end training reaches **~44 img/s against that 63 img/s ceiling — about 70 %**. The
+GPU, not the input pipeline, is what saturates first, and it plateaus above batch 8.
+
+Every dataloader change was then A/B-tested with interleaved repetitions (single runs
+varied 28–46 img/s for the *same* config, so one-shot comparisons prove nothing):
+
+| Change | Result |
+| ------ | ------ |
+| Pre-group annotations instead of scanning the frame per item | **1.03×** (at 40,852 rows) |
+| Drop `hue` from ColorJitter (saves 13.6 ms/image of CPU) | **1.04×** |
+| Raise workers 16 → 24 or 32 | **slower** (contention) |
+| Pin workers to 1 thread each | no change |
+| Raise `prefetch_factor` above 2 | **slower** |
+
+The lesson: with 16 workers the CPU pipeline already supplies more images than the GPU can
+consume, so making it cheaper does not make training faster. Per-image CPU cost is real
+(ColorJitter 16.8 ms, of which hue alone is 13.6 ms; GaussianBlur 7.1 ms; JPEG decode
+2.7 ms) — it is simply hidden behind worker parallelism.
+
+**What actually helps:** batch size, which is a GPU-side effect — 4 → 16 lifts the ceiling
+from 43 to 63 img/s. That is already applied. Beyond it, this workload wants a faster or
+additional GPU, not a faster loader.
 
 ### Re-measuring
 
@@ -190,6 +210,12 @@ you would expect when the GPU is waiting on input.
 plain dry-run **never unfreezes the backbone** and understates both VRAM and epoch time for
 the phase that dominates a real run. To measure the unfrozen phase, temporarily set
 `FREEZE_BACKBONE_EPOCHS = 0` in the model's `config.py`, run the dry-run, then restore it.
+
+**Throughput measurements on this box are noisy.** Repeated runs of an identical config
+ranged 28–46 img/s, drifting with page cache and GPU clocks. A single before/after pair
+will happily "show" a 25 % gain that does not exist — an earlier version of this document
+reported exactly that. Any throughput claim here comes from interleaving the variants
+across ≥5 repetitions and comparing medians. Do the same before believing a speedup.
 
 Two scripts do extra work around training:
 
@@ -242,7 +268,7 @@ smaller than 96 GB, pass the `BATCH_*` values that `setup_server.sh` printed.
 | `CUDA out of memory` | Re-run with a smaller `BATCH=<n>`. The script prints a suggestion on failure. |
 | `CUDA error: no kernel image is available` | Wrong torch build for the GPU. Re-run `setup_server.sh`, or pin a newer `TORCH_INDEX`. |
 | `Cannot reach gpumart` | Trial box expired or the IP changed — `GPU_HOST=<new-ip> bash scripts/connect.sh --setup`. |
-| GPU sits below 60 % utilised | Batch is too small; raise `BATCH`. Check the dataloader worker count too. |
+| GPU sits below 60 % utilised | Usually normal here — see [the bottleneck analysis](#the-workload-is-gpu-bound-and-the-dataloader-is-not-the-limit). Raise `BATCH` first; do not assume the dataloader is at fault. |
 | Training died when SSH dropped | Use `tmux` (see [Running unattended](#running-unattended)). |
 | `executorch` failed to install | Export-only dependency — training is unaffected. Export on a machine that has it. |
 
