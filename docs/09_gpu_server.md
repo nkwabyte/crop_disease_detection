@@ -109,11 +109,13 @@ it later on whatever machine builds the mobile `.pte` artifacts.
 
 ## 2. Get the data onto the server
 
-The datasets are git-ignored (large). Everything lives under `data/`:
+**The whole `data/` tree is git-ignored** — images *and* annotations. Nothing here comes
+with a clone, so it must be synced or downloaded onto the server, and you should keep your
+own backup of the label CSVs.
 
 ```text
 data/detector/{train,validate,test}/{Corn,Pepper,Tomato}/*.jpg   # Faster RCNN / ViT / Swin
-data/detector/final_{train,validate,test}_labels.csv             # tracked in the repo
+data/detector/final_{train,validate,test}_labels.csv             # annotations — not in git
 data/detector/label_map.json
 data/yolo/{train,valid,test}/{images,labels}/                    # YOLO / RT-DETR, and the
 data/yolo/classifier_{train,valid,test}.csv                      #   classifier's source
