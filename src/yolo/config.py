@@ -14,9 +14,18 @@ MODELS_DIR   = PROJECT_ROOT / "models"
 MODELS_DIR.mkdir(exist_ok=True)
 
 # ── Model & Hyperparameters ───────────────────────────────────────────────────
+# PENDING EXPERIMENT — see docs/08_next_steps.md § "PENDING — run these on the next
+# GPU box". Two independent yolo26n runs plateaued at mAP50 ~0.277, and the split
+# holds only ~124 training images per disease class, so capacity may not be what is
+# limiting. Sweep n -> s -> m on the next full run and judge on mAP per MB: the app
+# already carries a 29 MB classifier, and this detector's .pte is currently 9.3 MB.
 MODEL_SIZE     = MODELS_DIR / "yolo26n.pt"   # pretrained weights saved in models/
 IMG_SIZE       = 640
 BASE_BATCH     = 32          # per-GPU default on MPS/CPU; 32 × yolo26n fits in 24 GB
+# Measured on an RTX 5090: batch 32 left the GPU at 27 % utilisation and 6.9 GB of
+# 31.4 GB. yolo26n is far too small to occupy a modern card at this batch — raise it
+# and watch nvidia-smi. Re-measure per box; a 24 GB A5000 has less headroom than the
+# 32 GB card these numbers came from.
 CUDA_BATCH     = 64          # per-GPU default when a CUDA GPU is detected (96 GB RTX PRO 6000)
 EPOCHS_DEFAULT = 200
 PATIENCE       = 25
