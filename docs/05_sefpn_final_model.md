@@ -1,6 +1,6 @@
 # SE-FPN Faster RCNN — Final Production Model
 
-**Script:** `src/fasterrcnn/train_final.py`  
+**Script:** `src/fasterrcnn/faster_rcnn_final.py`  
 **Output directory:** `final_output/`  
 **Role:** Primary research contribution; all 8 custom innovations evaluated against the `resnet50_300` ablation baseline
 
@@ -175,7 +175,7 @@ Two evaluation outputs not present in the baseline or ablation scripts:
 ### Quick start
 
 ```bash
-python train_final.py
+python faster_rcnn_final.py
 ```
 
 This runs 4 steps automatically: hard negatives → K-means anchors → training (50 ep, EMA, grad accum, SGDR) → TTA evaluation + 15 figures + export.
@@ -184,29 +184,29 @@ This runs 4 steps automatically: hard negatives → K-means anchors → training
 
 | Command | Purpose |
 |---|---|
-| `python train_final.py` | Full 4-step pipeline from scratch |
-| `python train_final.py --dry-run` | 2-epoch timing estimate |
-| `python train_final.py --skip-negatives` | Negatives already downloaded |
-| `python train_final.py --figures-only` | Regenerate all 15 figures from `best.pth` |
-| `python train_final.py --export-only` | Re-export best checkpoint to mobile formats |
-| `python train_final.py --no-figures` | Train without generating figures |
-| `python train_final.py --no-ema` | Disable EMA (faster iteration, slightly lower mAP) |
-| `python train_final.py --no-tta` | Disable TTA at final evaluation |
-| `python train_final.py --epochs 60` | Override epoch count |
-| `DRY_RUN=1 python train_final.py` | Dry-run via environment variable |
+| `python faster_rcnn_final.py` | Full 4-step pipeline from scratch |
+| `python faster_rcnn_final.py --dry-run` | 2-epoch timing estimate |
+| `python faster_rcnn_final.py --skip-negatives` | Negatives already downloaded |
+| `python faster_rcnn_final.py --figures-only` | Regenerate all 15 figures from `best.pth` |
+| `python faster_rcnn_final.py --export-only` | Re-export best checkpoint to mobile formats |
+| `python faster_rcnn_final.py --no-figures` | Train without generating figures |
+| `python faster_rcnn_final.py --no-ema` | Disable EMA (faster iteration, slightly lower mAP) |
+| `python faster_rcnn_final.py --no-tta` | Disable TTA at final evaluation |
+| `python faster_rcnn_final.py --epochs 60` | Override epoch count |
+| `DRY_RUN=1 python faster_rcnn_final.py` | Dry-run via environment variable |
 
 ### Resume
 
 ```bash
-python train_final.py              # detects last.pth → resumes with EMA + SGDR state
-python train_final.py --skip-negatives
+python faster_rcnn_final.py              # detects last.pth → resumes with EMA + SGDR state
+python faster_rcnn_final.py --skip-negatives
 ```
 
 Force fresh start:
 
 ```bash
 rm -rf final_output/checkpoints
-python train_final.py
+python faster_rcnn_final.py
 ```
 
 ---

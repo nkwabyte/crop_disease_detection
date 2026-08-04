@@ -35,7 +35,7 @@ command -v flatc >/dev/null 2>&1 || {
 }
 
 echo "  ▶ exporting Faster R-CNN v2   (checkpoint: $CKPT)"
-"$PY" -m src.fasterrcnn.train_fasterrcnn --export-only "$@"
+"$PY" -m src.fasterrcnn.train_alt_faster_rcnn --mode baseline --export-only "$@"
 rc=$?
 [ "$rc" -eq 0 ] && ls -lh outputs/fasterrcnn_output/models/*.pte models/*fasterrcnn* 2>/dev/null | awk '{print "    "$9"  "$5}'
 exit "$rc"

@@ -13,7 +13,7 @@
 #   bash scripts/train_final.sh --no-ema --no-tta
 #   bash scripts/train_final.sh --export-only   # re-export the best checkpoint
 #
-# Extra args pass through to `python -m src.fasterrcnn.train_final`.
+# Extra args pass through to `python -m src.fasterrcnn.faster_rcnn_final`.
 # Logs to logs/final.log. Resume-aware — re-run to continue from the last checkpoint.
 # Exports at the end of training on its own; no separate export step.
 #
@@ -23,7 +23,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 MODEL="final"
-MODULE="src.fasterrcnn.train_final"
+MODULE="src.fasterrcnn.faster_rcnn_final"
 
 # Unbuffered so `tee` streams progress live instead of block-buffering it.
 export PYTHONUNBUFFERED=1
