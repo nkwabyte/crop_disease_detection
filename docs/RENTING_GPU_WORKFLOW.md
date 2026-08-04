@@ -12,29 +12,61 @@ convenience is worth it when you are training most days across several competiti
 
 ## 1. Which plan to rent
 
-The binding constraint is VRAM. The crop project's ViTDet wants roughly 30 to 40 GB at its
-default batch, so a 48 GB card runs everything with no tuning. Biohub only needs about
-16.5 GB, so it fits anything from 24 GB up.
+> **Revised 2026-08-04 from measurement.** An earlier version of this section said the
+> crop ViTDet "wants roughly 30 to 40 GB" and recommended the 48 GB tier. That estimate
+> was never measured. Benchmarked on a rented RTX 5090, **ViTDet peaks at 12.2 GB** at
+> batch 16 — a third of the estimate. The recommendation below changes accordingly.
+> Evidence is in [section 5a](#5a-measured-performance-rtx-5090) and
+> [`scripts/README.md`](../scripts/README.md#measured-performance).
 
-Recommended primary: the 48 GB tier.
+The binding constraint is still VRAM, but it is **biohub (~16.5 GB), not crop (12.2 GB)**.
+That flip is what moves the recommendation down a tier.
 
-- RTX A6000 dedicated, 48 GB, about 329.40/mo. Bare metal, runs both projects at
-  documented defaults. Best value with no compromises.
-- RTX Pro 5000 VPS, 48 GB Blackwell, about 349/mo. Newer generation, a bit faster, same
-  48 GB. Either is a fine primary.
+**Recommended primary: the 24 GB tier** — RTX A5000 or RTX Pro 4000, about 175 to 199/mo.
 
-Step up only if you want speed for a tight deadline:
+- Covers biohub's ~16.5 GB with headroom, and crop's 12.2 GB with room to spare.
+- Roughly **45 % cheaper** than the 48 GB tier this doc previously recommended, for no
+  measured loss on either project.
+- Crop needs no batch tuning at all on 24 GB; see the revised cheatsheet in section 5.
 
-- RTX Pro 6000, 96 GB, about 599/mo, roughly 1.7x faster.
-- A100 40 GB, about 399 to 639/mo depending on the listing, HBM memory.
+Why not step up to 48 GB or 96 GB: crop's throughput **plateaus above batch 8** — 61.7,
+63.2 and 64.1 img/s at batches 8, 16 and 24 respectively, while VRAM climbs 5.9 → 14.7 GB.
+Tripling the batch bought 4 % throughput. Extra VRAM past ~24 GB therefore buys almost
+nothing on these models; you would be paying for memory that sits idle. The 5090 tested
+here ran at **61 % of its VRAM unused**.
 
-Step down only to save money if you accept batch tuning:
+Step up only if:
 
-- RTX A5000 or RTX Pro 4000, 24 GB, about 175 to 199/mo. Both projects still run, but you
-  lower the crop ViT and Faster R-CNN batch sizes (see section 5).
+- You are adding a workload that genuinely needs the memory — LLM fine-tuning, large
+  diffusion training, or video models. None of the current repos do.
+- You need ECC. Consumer cards (GeForce 5090/4090) have **no ECC**; a silent bit flip nine
+  hours into an eleven-hour run is undetectable and unrecoverable. The A6000 and RTX Pro
+  cards have it. This is the strongest argument for the 48 GB tier, and it is a
+  reliability argument, not a capacity one.
 
-Skip 16 GB cards (A4000, V100) for the heavy crop detectors, and skip multi-GPU servers:
-most training scripts here are single-GPU, so extra cards sit idle.
+Skip 16 GB cards: crop would fit, but biohub's 16.5 GB would not. Skip multi-GPU servers
+for now — the training scripts are single-GPU. (Note though that because throughput
+plateaus, two cheaper GPUs in data-parallel would scale these detectors better than one
+faster GPU, if the scripts were ever adapted for it.)
+
+### Check the machine class, not just the card
+
+The listing advertises the GPU; it does not always say what the host is. The 5090 box
+tested here turned out to be a **KVM virtual machine**, not bare metal:
+
+| | Found |
+| --- | --- |
+| Virtualization | KVM, full virtualization |
+| CPU | "Intel Core Processor (Broadwell)" — generic QEMU model, 32 vCPU (1 core/socket each) |
+| SIMD | AVX2 yes, **AVX-512 no** — CPU image augmentation runs ~2× slower than on modern silicon |
+| GPU link | **PCIe Gen 3 x16** (the 5090 supports Gen 5) |
+| ECC | Not available (GeForce) |
+| Disk | virtio, 475 MB/s write |
+
+None of this blocked the workload — PCIe Gen 3 is using under 2 % of its bandwidth here,
+and the slow CPU augmentation is hidden behind dataloader workers. But it is worth asking
+the provider directly whether a tier is bare metal or VPS, and whether ECC is available,
+before committing monthly.
 
 ---
 
@@ -57,11 +89,15 @@ nvidia-smi
 ```bash
 git clone <crop-repo-url> crop_disease_detection && cd crop_disease_detection
 git checkout dev
-python3 -m venv .venv
-./.venv/bin/pip install --upgrade pip
-./.venv/bin/pip install -r requirements-server.txt     # torch pulls the CUDA build on Linux
-./.venv/bin/python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"
+bash scripts/setup_server.sh        # venv + a torch build matching the GPU's architecture
 ```
+
+Do not just `pip install -r requirements-server.txt` on a recent card. **Blackwell GPUs
+(RTX 5090/5080, compute capability sm_120) need CUDA 12.8+ wheels**, and
+`torch.cuda.is_available()` returns `True` even when the installed wheel contains no
+sm_120 kernels — it only fails at the first real operation, as `CUDA error: no kernel image
+is available`. `setup_server.sh` installs from the cu128 index and proves it with an actual
+fp16 matmul, then prints VRAM-appropriate batch sizes.
 
 If executorch fails to install, ignore it: it is only needed for the export and quantize
 steps, not training.
@@ -90,14 +126,21 @@ scripts/bring_up_cloud.sh --with-zebrahub     # bare box to training-ready, incl
 
 The datasets are git-ignored (large). On a monthly box you do this once and it persists.
 
-Crop-disease (about 7.4 GB total). Either rsync from your Mac, or use the Roboflow
-download documented in docs/07_dataset.md.
+Crop-disease: **~4.1 GB needs uploading**, not the 7.7 GB the directories measure. 3.6 GB
+of `data/**/*.npy` are Ultralytics `cache="disk"` sidecars that the server regenerates on
+its first epoch, and `*.cache` label indexes embed absolute paths. Shipping them nearly
+doubles the transfer for files that get overwritten.
 
 ```bash
-# from your Mac, into the server:
-rsync -avP dataset/train dataset/validate dataset/test  user@<server-ip>:~/crop_disease_detection/dataset/
-rsync -avP data/main                                    user@<server-ip>:~/crop_disease_detection/data/
+bash scripts/sync_data.sh          # code + data, correct exclusions, resumable
+bash scripts/sync_data.sh subset   # 10 % slice (~380 MB) for a quick throughput check
 ```
+
+Budget for it: on a 1.4 Mbps home uplink, 4.1 GB takes about **6.7 hours**. Measure your
+own upload before planning around it — if it is slow, use the Roboflow download in
+[`docs/07_dataset.md`](07_dataset.md) from the server's datacenter link instead, or start
+with `subset` to get timings the same day and top up the rest overnight (rsync skips what
+the subset already placed).
 
 Biohub (about 82 GB). The bring-up script streams it; otherwise fetch the external crops:
 
@@ -147,19 +190,64 @@ python scripts/run_local_eval.py --checkpoint checkpoints/detector_ext_long_a/ck
 
 ## 5. Batch-size cheatsheet by card VRAM
 
-Crop defaults are tuned for a large card. On smaller VRAM, lower these two memory-heavy
-runs; everything else fits. Biohub fits at defaults on any 24 GB+ card.
+Revised from measurement — the previous table assumed ViT needed far more memory than it
+does. Biohub fits at defaults on any 24 GB+ card.
 
 | Card VRAM | Crop ViT (BATCH_VIT) | Crop Faster R-CNN / final / Swin | Notes |
 | --------- | -------------------- | -------------------------------- | ----- |
-| 48 GB (A6000, Pro 5000, A40) | 8 (default) | 16 (default) | No tuning needed |
-| 40 GB (A100) | 8 | 16 | ViT tight but fits |
-| 32 GB (RTX 5090) | 6 to 8 | 16 | Near-default |
-| 24 GB (A5000, Pro 4000, 4090) | 2 to 4 | 8 | Set BATCH_VIT / BATCH_FRCNN / BATCH_FINAL / BATCH_SWIN |
-| 96 GB (Pro 6000) | 12 to 16 | 24 to 32 | Push higher for speed |
+| 24 GB (A5000, Pro 4000, 4090) | 16 | 16 | **Recommended tier.** ViT peaks ~12.2 GB |
+| 32 GB (RTX 5090) | 16 | 16 | Measured: 12.2 GB used of 31.4 |
+| 40 GB (A100) | 16 | 16 | Headroom unused |
+| 48 GB (A6000, Pro 5000, A40) | 16 | 16 | Headroom unused |
+| 96 GB (Pro 6000) | 16 | 24 to 32 | Past batch 8 the gain is ~4 % |
+| 16 GB (A4000, V100) | 8 | 8 | Crop fits; biohub does not |
 
-Rule of thumb: watch `nvidia-smi` during the first epoch. If it OOMs, halve the batch; if
-the GPU sits below 60 percent utilised, raise it.
+Note the column is now nearly constant. That is the point: **throughput plateaus above
+batch 8**, so there is no reason to push the batch higher on a bigger card. Batch 8 already
+delivers 96 % of peak throughput at roughly half the memory.
+
+The per-model scripts (`scripts/train_<model>.sh`) read the GPU's actual VRAM and apply
+these automatically — you only need this table when using `train_all_gpu.sh`, which does
+not auto-scale.
+
+Rule of thumb: if it OOMs, halve the batch. **Do not** raise the batch merely because the
+GPU sits below 60 % utilised — on these detectors that is normal and is not a sign the
+batch is too small; see section 5a.
+
+---
+
+## 5a. Measured performance (RTX 5090)
+
+Benchmarked 2026-08-04 on a rented 5090 (31.4 GB, 32 vCPU, 82 GB RAM), crop repo.
+Detector figures use a 10 % subset (4,076 train images); the classifier used its full data.
+
+| Model | Batch | Peak VRAM | Throughput | Full 40-epoch estimate |
+| ----- | ----- | --------- | ---------- | ---------------------- |
+| ViTDet (ViT-B/16 @640) | 16 | 12.2 GB | ~44 img/s | **~11 h** |
+| Swin-V2-T @640 | 16 | 4.5 GB | — | ~10 h |
+| Classifier (EfficientNet-B2) | 128 | — | 7 s/epoch | **~7 min** |
+
+Classifier test accuracy after only 2 epochs was 83.76 % (Corn f1 0.98, Pepper 0.85,
+**Tomato 0.58 — recall just 0.47**, worth watching in a full run).
+
+**The workload is GPU-bound, not input-bound.** Pure GPU throughput with no dataloader is
+63.2 img/s at batch 16; end-to-end training reaches ~44 img/s, about 70 % of that ceiling.
+Every dataloader change tested — pre-grouping annotations, dropping the expensive `hue`
+augmentation, more workers, thread pinning, deeper prefetch — moved end-to-end throughput
+by 1.04× or less, or made it worse. With 16 workers the CPU pipeline already outruns the
+GPU.
+
+Two practical consequences:
+
+- Low GPU utilisation (30–60 %) is expected here and is **not** a tuning failure.
+- A faster single GPU buys little, because throughput plateaus above batch 8.
+
+Beware when benchmarking this yourself: repeated runs of an *identical* configuration
+varied 28–46 img/s on this box. Interleave the variants across several repetitions and
+compare medians — a single before/after pair will show speedups that do not exist.
+
+Also note `--dry-run` is 2 epochs while `FREEZE_BACKBONE_EPOCHS = 5`, so a plain dry-run
+never unfreezes the ViT/Swin backbone and understates the phase that dominates a real run.
 
 ---
 
@@ -170,6 +258,25 @@ watch -n2 nvidia-smi        # GPU utilisation and memory
 tail -f logs/vit.log        # live crop training log (per step in scripts/train_all_gpu.sh)
 tail -f checkpoints/detector_ext_long_a/train.log   # biohub
 ```
+
+From your Mac, without opening a shell on the box:
+
+```bash
+bash scripts/connect.sh --gpu          # one-shot nvidia-smi
+bash scripts/connect.sh --watch        # live GPU status
+bash scripts/connect.sh --logs vit     # tail a training log
+```
+
+On a new box, check for **thermal throttling** before trusting a long run — a card that
+holds clocks for five minutes may still decay over eleven hours:
+
+```bash
+nvidia-smi --query-gpu=temperature.gpu,power.draw,clocks.sm,clocks_event_reasons.hw_thermal_slowdown,clocks_event_reasons.sw_power_cap \
+  --format=csv,noheader -l 15
+```
+
+`hw_thermal_slowdown` or `sw_thermal_slowdown` going `Active`, or the SM clock decaying
+steadily, means sustained throughput will be below what a short benchmark suggests.
 
 ---
 
@@ -226,8 +333,14 @@ file the competition asks for.
   cancel and re-provision later without re-streaming 82 GB.
 - If a competition ends and the next is weeks away, cancel the monthly plan and switch to
   hourly rental for the gap, then come back to monthly when training ramps up again.
-- One 48 GB box serves both repos and any typical Zindi vision task, so you do not need a
-  second server.
+- One 24 GB box serves both repos and any typical Zindi vision task, so you do not need a
+  second server. (This previously said 48 GB — measurement showed 24 GB is enough; see
+  section 1.)
+- Right-size from measurement, not from estimates. Following the old 48 GB recommendation
+  costs roughly **150/mo more** than the 24 GB tier for capacity that measurement shows
+  goes unused. Before committing to any tier, run `bash scripts/train_vit.sh --dry-run` and
+  read the peak VRAM off `nvidia-smi` — it takes minutes and it is the number that decides
+  the plan.
 
 ---
 
@@ -236,8 +349,13 @@ file the competition asks for.
 | Task | Command |
 | ---- | ------- |
 | Start persistent session | `tmux new -s train` |
+| Bootstrap a fresh box | `bash scripts/setup_server.sh` |
+| Push code + data | `bash scripts/sync_data.sh` |
+| Pull results back | `bash scripts/sync_data.sh pull` |
+| Connect / watch GPU / tail log | `bash scripts/connect.sh` · `--watch` · `--logs vit` |
+| Train one model | `bash scripts/train_vit.sh` (or `--dry-run`) |
 | Crop full sweep | `bash scripts/train_all_gpu.sh 2>&1 \| tee logs/sweep.log` |
-| Crop subset + batch override | `BATCH_VIT=4 bash scripts/train_all_gpu.sh vit` |
+| Crop subset + batch override | `BATCH_VIT=16 bash scripts/train_all_gpu.sh vit` |
 | Biohub pretrain then detector | `python scripts/train.py --config configs/pretrain_ext_a.yaml --pretrain` |
 | Biohub bring-up + data | `scripts/bring_up_cloud.sh --with-zebrahub` |
 | Watch GPU | `watch -n2 nvidia-smi` |
