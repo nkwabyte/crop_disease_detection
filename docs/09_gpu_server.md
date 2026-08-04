@@ -180,6 +180,8 @@ BATCH_VIT=12 BATCH_SWIN=24 bash scripts/train_all_gpu.sh vit swin
 ./.venv/bin/python -m src.yolo.train
 ./.venv/bin/python -m src.fasterrcnn.train_alt_faster_rcnn --mode baseline
 ./.venv/bin/python -m src.fasterrcnn.faster_rcnn_final
+# the 7-config ablation is not part of the sweep — run it explicitly when needed:
+./.venv/bin/python -m src.fasterrcnn.train_alt_faster_rcnn --mode ablation
 ./.venv/bin/python -m src.vit.train_vit --batch-size 12
 ./.venv/bin/python -m src.swin.train_swin --batch-size 24
 ./.venv/bin/python -m src.rtdetr.train_rtdetr --batch-size 24
