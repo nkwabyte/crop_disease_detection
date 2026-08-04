@@ -705,7 +705,7 @@ with gr.Blocks(title="Crop Disease Detector", theme=_THEME, css=CUSTOM_CSS) as d
                     chart_output = gr.Plot(label="Detection confidence breakdown")
 
     # ── Example images ────────────────────────────────────────────────────────
-    sample_dir    = PROJECT_ROOT / "data" / "main" / "test" / "images"
+    sample_dir    = PROJECT_ROOT / "data" / "yolo" / "test" / "images"
     sample_images = sorted(sample_dir.glob("*.jpg"))[:6] if sample_dir.exists() else []
 
     if sample_images:

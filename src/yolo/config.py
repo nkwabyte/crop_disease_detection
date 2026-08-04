@@ -4,7 +4,7 @@ from pathlib import Path
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-DATA_DIR     = PROJECT_ROOT / "data" / "main"
+DATA_DIR     = PROJECT_ROOT / "data" / "yolo"
 NEG_DIR      = PROJECT_ROOT / "data" / "negatives"
 FIXED_YAML   = PROJECT_ROOT / "data_fixed.yaml"
 RUNS_DIR     = PROJECT_ROOT / "runs"

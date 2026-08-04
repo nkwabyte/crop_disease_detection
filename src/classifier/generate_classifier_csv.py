@@ -9,7 +9,7 @@ fine-grained disease class IDs to the three parent crop types:
   Pepper (classes 5–14)
   Tomato (classes 15–22)
 
-Output files (written to dataset/):
+Output files (written to data/yolo/, beside the images they reference):
   classifier_train.csv
   classifier_valid.csv
   classifier_test.csv
@@ -27,7 +27,7 @@ case) the majority vote wins; ties go to the first crop found.
 Usage
 -----
   python generate_classifier_csv.py
-  python generate_classifier_csv.py --data-dir data/main --out-dir dataset
+  python generate_classifier_csv.py --data-dir data/yolo --out-dir data/yolo
 """
 
 import argparse
@@ -218,12 +218,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--data-dir",
-        default="data/main",
+        default="data/yolo",
         help="Root of the YOLO dataset (contains train/, valid/, test/)",
     )
     parser.add_argument(
         "--out-dir",
-        default="dataset",
+        default="data/yolo",
         help="Directory to write the classifier CSV files into",
     )
     parser.add_argument(

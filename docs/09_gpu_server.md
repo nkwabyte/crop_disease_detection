@@ -109,13 +109,19 @@ it later on whatever machine builds the mobile `.pte` artifacts.
 
 ## 2. Get the data onto the server
 
-The datasets are git-ignored (large). Place them exactly where the configs expect:
+The datasets are git-ignored (large). Everything lives under `data/`:
 
 ```text
-dataset/train/  dataset/validate/  dataset/test/      # Faster RCNN / ViT / Swin / classifier
-dataset/final_{train,validate,test}_labels.csv        # (already tracked in the repo)
-data/main/{train,valid,test}/{images,labels}/         # YOLO / RT-DETR (YOLO format)
+data/detector/{train,validate,test}/{Corn,Pepper,Tomato}/*.jpg   # Faster RCNN / ViT / Swin
+data/detector/final_{train,validate,test}_labels.csv             # tracked in the repo
+data/detector/label_map.json
+data/yolo/{train,valid,test}/{images,labels}/                    # YOLO / RT-DETR, and the
+data/yolo/classifier_{train,valid,test}.csv                      #   classifier's source
+data/negatives/{images,eggplant,millet,potato,sorghum,tobacco,ood}/
 ```
+
+Detector images are grouped into a per-crop subdirectory; the loaders read the crop from
+the CSV's `crop` column and build the path from it.
 
 Get them via the Roboflow download in [`docs/07_dataset.md`](07_dataset.md), or push from
 the laptop:
@@ -126,12 +132,13 @@ bash scripts/sync_data.sh data      # ~4.1 GB, resumable
 
 ### How much actually needs to move
 
-`dataset/` and `data/` measure ~7.7 GB on disk, but only **~4.1 GB needs uploading**:
+`data/` measures ~7.7 GB on disk, but only **~4.1 GB needs uploading**:
 
 | Path | On disk | Upload | Why |
 | ---- | ------- | ------ | --- |
-| `dataset/` (58,361 JPEGs) | 3.79 GB | 3.79 GB | All referenced by the label CSVs — nothing to prune |
-| `data/` JPEG + `.txt` labels | 0.29 GB | 0.29 GB | The actual YOLO / RT-DETR training data |
+| `data/detector/` (58,361 JPEGs) | 3.79 GB | 3.79 GB | All referenced by the label CSVs — nothing to prune |
+| `data/yolo/` JPEG + `.txt` labels | 0.29 GB | 0.29 GB | The actual YOLO / RT-DETR training data |
+| `data/negatives/` | 0.5 GB | 0.5 GB | Hard negatives + non-target foliage |
 | `data/**/*.npy` | 3.60 GB | — | Ultralytics `cache="disk"` sidecars; regenerated on epoch 1 |
 | `data/**/*.cache` | 1.6 MB | — | Label index embedding absolute paths; must be rebuilt anyway |
 

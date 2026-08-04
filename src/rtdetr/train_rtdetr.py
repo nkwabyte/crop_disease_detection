@@ -7,7 +7,7 @@ region-based Faster R-CNN heads (used by the ViT and Swin detectors here), its
 inference is static-shape, which makes it the most ExecuTorch-friendly *full model*
 of the transformer detectors — a strong candidate for the mobile app.
 
-It trains on the same YOLO-format dataset (data/main/) as YOLO26, with the same
+It trains on the same YOLO-format dataset (data/yolo/) as YOLO26, with the same
 0-indexed class order, so it slots straight into the benchmark on mAP@0.5.
 
 This file is SELF-CONTAINED: the data-yaml writer and hard-negative staging are
