@@ -130,20 +130,84 @@ def process_split(
 
 def write_csv(rows: list[dict], out_path: Path) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    fields = ["image_path", "crop_label", "crop_id", "split"]
+    if rows and "source" in rows[0]:
+        fields.append("source")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     with out_path.open("w", newline="") as f:
-        writer = csv.DictWriter(
-            f, fieldnames=["image_path", "crop_label", "crop_id", "split"]
-        )
+        writer = csv.DictWriter(f, fieldnames=fields)
         writer.writeheader()
         writer.writerows(rows)
+
+
+# ── "Other" class: non-target foliage and general photographs ────────────────
+
+OTHER_ID = 3
+NEG_SPLIT = (0.58, 0.21, 0.21)      # matches the crop splits' train/valid/test ratio
+
+
+def collect_negatives(neg_root: Path, project_root: Path) -> list[dict]:
+    """One row per negative image, tagged with the folder it came from.
+
+    Every subdirectory of data/negatives/ is treated as a negative source, so
+    dropping a folder (say `eggplant/`, once it becomes a target crop) and
+    re-running this script is all that is needed to retrain without it.
+
+    `labels/` and `images/` are skipped: they belong to the detector pipelines'
+    hard-negative cache, not to this classifier.
+    """
+    skip = {"labels", "images"}
+    exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+    rows: list[dict] = []
+    for sub in sorted(p for p in neg_root.iterdir() if p.is_dir()):
+        if sub.name in skip:
+            continue
+        files = sorted(p for p in sub.iterdir()
+                       if p.suffix.lower() in exts and not p.name.startswith("._"))
+        for p in files:
+            rows.append({
+                "image_path": str(p.relative_to(project_root)),
+                "crop_label": "Other",
+                "crop_id": OTHER_ID,
+                "split": "",              # assigned below
+                "source": sub.name,
+            })
+    return rows
+
+
+def split_negatives(rows: list[dict], seed: int = 42) -> list[dict]:
+    """Assign train/valid/test per source folder, so every split sees every source.
+
+    Splitting the pooled list instead would let a small source (sorghum, 21
+    images) land entirely in one split and silently vanish from the others.
+    """
+    import random
+    by_source: dict[str, list[dict]] = {}
+    for r in rows:
+        by_source.setdefault(r["source"], []).append(r)
+
+    out: list[dict] = []
+    for source, items in sorted(by_source.items()):
+        rng = random.Random(f"{seed}-{source}")     # deterministic per source
+        rng.shuffle(items)
+        n = len(items)
+        n_tr = int(n * NEG_SPLIT[0])
+        n_va = int(n * NEG_SPLIT[1])
+        for i, r in enumerate(items):
+            r["split"] = "train" if i < n_tr else "valid" if i < n_tr + n_va else "test"
+            out.append(r)
+    return out
 
 
 def print_stats(rows: list[dict], split: str) -> None:
     counts = Counter(r["crop_label"] for r in rows)
     total  = len(rows)
     print(f"\n  {split:6s}  ({total} images)")
-    for crop in ["Corn", "Pepper", "Tomato"]:
-        n = counts.get(crop, 0)
+    # Derived from the rows so the 4-class "Other" variant reports too.
+    for crop in ["Corn", "Pepper", "Tomato", "Other"]:
+        if crop not in counts:
+            continue
+        n = counts[crop]
         bar = "█" * (n * 30 // max(total, 1))
         print(f"    {crop:<8}  {n:5d}  {bar}")
 
@@ -162,6 +226,17 @@ def main() -> None:
         default="dataset",
         help="Directory to write the classifier CSV files into",
     )
+    parser.add_argument(
+        "--with-negatives",
+        action="store_true",
+        help="Add a 4th 'Other' class from data/negatives/*/ and write "
+             "classifier_ood_{split}.csv instead (leaves the 3-class CSVs alone)",
+    )
+    parser.add_argument(
+        "--neg-dir",
+        default="data/negatives",
+        help="Root of the negative-image folders (one subdirectory per source)",
+    )
     args = parser.parse_args()
 
     project_root = Path(__file__).resolve().parent.parent.parent
@@ -174,9 +249,10 @@ def main() -> None:
         ("test",  "test"),
     ]
 
-    print("Generating classifier CSVs …")
-    all_rows: list[dict] = []
+    prefix = "classifier_ood" if args.with_negatives else "classifier"
+    print(f"Generating {prefix}_*.csv …")
 
+    crop_rows: dict[str, list[dict]] = {}
     for split_name, folder in splits:
         images_dir = data_dir / folder / "images"
         labels_dir = data_dir / folder / "labels"
@@ -184,9 +260,37 @@ def main() -> None:
         if not images_dir.exists():
             print(f"  [WARN] {images_dir} not found — skipping {split_name}")
             continue
+        crop_rows[split_name] = process_split(images_dir, labels_dir, split_name,
+                                              project_root)
 
-        rows = process_split(images_dir, labels_dir, split_name, project_root)
-        out_path = out_dir / f"classifier_{split_name}.csv"
+    neg_by_split: dict[str, list[dict]] = {}
+    if args.with_negatives:
+        neg_root = project_root / args.neg_dir
+        if not neg_root.exists():
+            raise SystemExit(f"  x negatives directory not found: {neg_root}")
+        negs = split_negatives(collect_negatives(neg_root, project_root))
+        if not negs:
+            raise SystemExit(f"  x no negative images found under {neg_root}")
+        for r in negs:
+            neg_by_split.setdefault(r["split"], []).append(r)
+
+        counts: dict[str, int] = {}
+        for r in negs:
+            counts[r["source"]] = counts.get(r["source"], 0) + 1
+        print(f"\n  'Other' class — {len(negs)} images from {len(counts)} sources")
+        for src, n in sorted(counts.items(), key=lambda kv: -kv[1]):
+            print(f"    {src:<12} {n:5d}")
+        # Crop rows carry a source tag too, so every row has the column.
+        for rows in crop_rows.values():
+            for r in rows:
+                r["source"] = r["crop_label"]
+
+    all_rows: list[dict] = []
+    for split_name, _ in splits:
+        if split_name not in crop_rows:
+            continue
+        rows = crop_rows[split_name] + neg_by_split.get(split_name, [])
+        out_path = out_dir / f"{prefix}_{split_name}.csv"
         write_csv(rows, out_path)
         print_stats(rows, split_name)
         print(f"  → {out_path}")
