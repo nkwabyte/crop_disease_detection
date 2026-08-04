@@ -872,7 +872,11 @@ Examples:
     else:  # fresh training (no last.pt, or last.pt is weights-only)
         if dry_run:
             print("  [DRY-RUN]  DRY-RUN — 1-epoch validation + timing")
-        model = YOLO(f"{MODEL_SIZE}.pt")
+        # MODEL_SIZE already ends in .pt (see src/yolo/config.py), so it is passed
+        # through as-is. Appending another ".pt" looked for models/yolo26n.pt.pt —
+        # a path that only gets built on a fresh start, which is why resumed runs
+        # never surfaced it.
+        model = YOLO(str(MODEL_SIZE))
         log_startup(device, batch, n_train, n_val, MODEL_SIZE, epochs, dry_run, use_amp)
 
         # ─────────────────────────────────────────────────────────────────────
