@@ -92,3 +92,6 @@ logs/
 
 # RT-DETR generated data yaml
 data_rtdetr.yaml
+
+# Versioned weight snapshots (scripts/archive_weights.py) — large binaries
+weights/
