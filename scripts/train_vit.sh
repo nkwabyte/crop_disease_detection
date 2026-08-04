@@ -25,22 +25,29 @@ cd "$(dirname "$0")/.."
 MODEL="vit"
 MODULE="src.vit.train_vit"
 
+# Unbuffered so `tee` streams progress live instead of block-buffering it.
+export PYTHONUNBUFFERED=1
+
 PY="${PY:-./.venv/bin/python}"
 [ -x "$PY" ] || PY="python3"
 mkdir -p logs
 
 # ── Batch size ────────────────────────────────────────────────────────────────
 # src/vit/config.py sets CUDA_BATCH_SIZE=8 assuming a 96 GB RTX PRO 6000.
-# ViT-B/16 at 640px is 1600 tokens per image — the most memory-hungry model here,
-# so a 32 GB card needs this roughly halved. ACCUM_STEPS=4 keeps the effective
-# batch reasonable even when the physical batch is small.
+# ViT-B/16 at 640px is 1600 tokens per image — the most memory-hungry model here.
+#
+# The 32 GB value is measured, not estimated: on an RTX 5090 with the backbone
+# unfrozen, batch 16 peaked at 12.2 GB of 31.4 GB (39%) and ran an epoch 1.27×
+# faster than batch 4. GPU utilisation still averaged only 59%, so this is
+# input-bound rather than memory-bound — raising it further helps less than
+# fixing the dataloader would. ACCUM_STEPS=4 multiplies the effective batch.
 pick_batch() {
   local mib gb
   mib=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -1)
   [ -n "${mib:-}" ] || { echo ""; return; }        # no GPU — let config.py decide
   gb=$(( mib / 1024 ))
   if   [ "$gb" -ge 80 ]; then echo 8      # RTX PRO 6000 96 GB (config default)
-  elif [ "$gb" -ge 30 ]; then echo 4      # RTX 5090 / 4090 32 GB
+  elif [ "$gb" -ge 30 ]; then echo 16      # RTX 5090 / 4090 32 GB
   elif [ "$gb" -ge 20 ]; then echo 2
   else                        echo 2
   fi

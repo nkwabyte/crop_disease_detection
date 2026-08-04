@@ -23,6 +23,9 @@ cd "$(dirname "$0")/.."
 MODEL="swin"
 MODULE="src.swin.train_swin"
 
+# Unbuffered so `tee` streams progress live instead of block-buffering it.
+export PYTHONUNBUFFERED=1
+
 PY="${PY:-./.venv/bin/python}"
 [ -x "$PY" ] || PY="python3"
 mkdir -p logs
@@ -30,14 +33,18 @@ mkdir -p logs
 # ── Batch size ────────────────────────────────────────────────────────────────
 # src/swin/config.py sets CUDA_BATCH_SIZE=16 assuming a 96 GB RTX PRO 6000.
 # Swin-V2-T (~28M params) uses windowed attention, so it is far lighter than the
-# ViT at the same resolution — but 16 × 640px still overshoots a 32 GB card.
+# ViT at the same resolution.
+#
+# Measured on an RTX 5090: batch 16 peaked at 4.7 GB of 31.4 GB with the backbone
+# frozen, at only 29% GPU utilisation — so the 96 GB default is also right here,
+# and the real ceiling is the input pipeline, not VRAM.
 pick_batch() {
   local mib gb
   mib=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -1)
   [ -n "${mib:-}" ] || { echo ""; return; }        # no GPU — let config.py decide
   gb=$(( mib / 1024 ))
   if   [ "$gb" -ge 80 ]; then echo 16     # RTX PRO 6000 96 GB (config default)
-  elif [ "$gb" -ge 30 ]; then echo 8      # RTX 5090 / 4090 32 GB
+  elif [ "$gb" -ge 30 ]; then echo 16      # RTX 5090 / 4090 32 GB
   elif [ "$gb" -ge 20 ]; then echo 4
   else                        echo 2
   fi
