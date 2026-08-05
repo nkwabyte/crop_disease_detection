@@ -62,8 +62,16 @@ def main() -> None:
         et_path = Path(str(et_res))
         pte_src = None
         if et_path.is_dir():
+            # Match the checkpoint by name: a previous export's artifacts can still
+            # be in this directory, and taking rglob()'s first hit silently shipped
+            # a stale .pte (same bug as src/yolo/export_yolo.py).
             files = list(et_path.rglob("*.pte"))
-            pte_src = files[0] if files else None
+            named = [p for p in files if p.stem == best.stem]
+            if named:
+                pte_src = named[0]
+            elif files:
+                pte_src = max(files, key=lambda p: p.stat().st_mtime)
+                print(f"[WARN] No {best.stem}.pte in {et_path}; using newest: {pte_src.name}")
         elif et_path.suffix == ".pte":
             pte_src = et_path
         if pte_src and pte_src.exists():
