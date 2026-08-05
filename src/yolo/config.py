@@ -15,11 +15,11 @@ MODELS_DIR   = PROJECT_ROOT / "models"
 MODELS_DIR.mkdir(exist_ok=True)
 
 # ── Model & Hyperparameters ───────────────────────────────────────────────────
-# PENDING EXPERIMENT — see docs/08_next_steps.md § "PENDING — run these on the next
-# GPU box". Two independent yolo26n runs plateaued at mAP50 ~0.277, and the split
-# holds only ~124 training images per disease class, so capacity may not be what is
-# limiting. Sweep n -> s -> m on the next full run and judge on mAP per MB: the app
-# already carries a 29 MB classifier, and this detector's .pte is currently 9.3 MB.
+# Capacity sweep DONE (2026-08-04) — see outputs/benchmarks/yolo_capacity_comparison.md
+# yolo26n 0.2904 | yolo26s 0.3054 (+5.2%) | yolo26m 0.3100 (+6.8%), for 8.7x the
+# parameters. The ceiling is the dataset (~124 training images per disease class),
+# not capacity, and accuracy per MB falls 7.7x from n to m — so yolo26n stays the
+# deployed model. Change this only with a deployment-size argument to match.
 # YOLO_MODEL / YOLO_EXP let a capacity sweep run without editing this file, and —
 # critically — give each variant its own runs/ directory so the sweep does not
 # overwrite the previous variant's weights.

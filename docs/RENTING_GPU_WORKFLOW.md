@@ -152,24 +152,19 @@ python scripts/fetch_zebrahub.py --output-dir data/zebrahub
 
 ## 4. Run training
 
-### ⏳ Before the first full run on a new box — carried over from the 5090 trial
+### Before the first full run on a new box
 
-Two experiments were deferred when the trial ended. Full rationale in
-[`docs/08_next_steps.md`](08_next_steps.md#-pending--run-these-on-the-next-gpu-box-a5000):
+1. **Re-run `bash scripts/setup_server.sh`.** It picks a torch build matching that
+   GPU's compute capability and prints VRAM-appropriate batch sizes.
+2. **Raise the YOLO batch size and re-measure.** On the 5090 these runs sat at
+   17–27 % GPU utilisation, so there is free wall-clock in a larger batch. The
+   A5000 has 24 GB against that box's 31.4 GB, so measure rather than copy a number.
 
-1. **Sweep YOLO26 n → s → m.** Two independent yolo26n runs plateaued at mAP50 ~0.277,
-   and the split has only ~124 training images per disease class — so it is unclear
-   whether capacity or data is the ceiling. The result decides where effort goes next,
-   whichever way it lands. Judge on **mAP per MB**: the app already carries a 29 MB
-   classifier and today's detector `.pte` is 9.3 MB. `MODEL_SIZE` in
-   `src/yolo/config.py` is the one line to change.
-2. **Raise the YOLO batch size.** At `--batch-size 32` the 5090 sat at 27 % utilisation
-   and 6.9 GB of 31.4 GB. Re-measure on the new card — a 24 GB A5000 has less headroom
-   than the box those numbers came from — but there is almost certainly free wall-clock
-   here.
-
-Also re-run `bash scripts/setup_server.sh` on the new box: it picks a torch build
-matching that GPU's compute capability and prints VRAM-appropriate batch sizes.
+The YOLO26 capacity question is **settled** — see
+[`docs/08_next_steps.md`](08_next_steps.md#ok-done--yolo26-capacity-sweep-rtx-5090-2026-08-04).
+8.7x the parameters bought 6.8 % mAP@0.5, so the ceiling is the dataset (~124 training
+images per disease class), not the model. yolo26n stays the deployed choice. **The
+highest-value work on the detector is now collecting more images, not architecture.**
 
 ### Crop-disease: the whole sweep, unattended
 

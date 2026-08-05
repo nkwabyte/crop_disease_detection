@@ -19,58 +19,55 @@ no NMS). The gaps below are ordered by impact-to-effort.
 
 ---
 
-## ⏳ PENDING — run these on the next GPU box (A5000)
+## [OK] DONE — YOLO26 capacity sweep (RTX 5090, 2026-08-04)
 
-Two things came out of the RTX 5090 trial (2026-08-04) that were deliberately *not*
-done then, because the trial was ending. Do them at the start of the next full
-training run.
+**Result: capacity is not the ceiling — the dataset is.** Full numbers, charts and
+the reproducing script:
+[`outputs/benchmarks/yolo_capacity_comparison.md`](../outputs/benchmarks/yolo_capacity_comparison.md)
+· [`src/benchmark/yolo_capacity.py`](../src/benchmark/yolo_capacity.py)
 
-### A. YOLO26 capacity sweep — n vs s vs m
+| Model | Params | best.pt | mAP@0.5 | mAP@0.5:0.95 | Epochs | vs baseline | mAP/MB |
+| ----- | ------ | ------- | ------- | ------------ | ------ | ----------- | ------ |
+| **yolo26n** | 2.51M | 5.4 MB | 0.2904 | 0.1162 | 150/179 | baseline | **0.0538** |
+| yolo26s | 9.97M | 20.4 MB | 0.3054 | 0.1208 | 116/120 | +5.2 % | 0.0150 |
+| yolo26m | 21.81M | 44.1 MB | 0.3100 | 0.1218 | 83/88 | +6.8 % | 0.0070 |
 
-**Why this is worth GPU hours:** it is a diagnosis, not a model beauty contest.
+![accuracy vs size](../outputs/benchmarks/figures/fig_yolo_01_accuracy_vs_size.png)
 
-The evidence for doing it: **two independent YOLO26n runs plateaued at the same
-place** — mAP50 **0.277** (previous full run, epoch 136) and ~0.25 at epoch 92 of the
-trial run. A ceiling hit twice is structural, and the likely structure is data
-volume: the YOLO split holds **3,199 training images across 23 disease classes,
-about 124 images per class**. That is a small-data regime, where extra capacity
-usually overfits rather than generalises.
+**8.7× the parameters buys 6.8 % mAP@0.5**, and the curve flattens across the sweep
+— n→s gains +5.2 %, s→m only a further +1.5 % for another 2.2× the parameters. Three
+prior yolo26n runs had already plateaued at ~0.28 on a split holding roughly **124
+training images per disease class**; this sweep confirms the limit is the data.
 
-So the experiment resolves which ceiling you are against:
+Two details that reinforce it:
 
-| Outcome | What it means | What to do next |
-| ------- | ------------- | --------------- |
-| 26m jumps sharply | Capacity *is* limiting | Pursue 26s + INT8, or distillation (Tier-3 item 9) |
-| 26m gains ~nothing | The ceiling is **data**, not the model | Redirect effort to collecting images — and report it: *"detector capacity is not the bottleneck at this dataset scale"* is a legitimate, citable finding |
+- The larger variants converged in **fewer** epochs (88 and 120 vs 179) before early
+  stopping — what you expect when a model saturates the available data rather than
+  straining against its own capacity.
+- Accuracy per megabyte falls **7.7×** from n to m.
 
-Either result is publishable and changes what you do next. That asymmetry is the
-justification for the GPU time.
+### What this changes
 
-**Include 26s, not just n and m.** It is the realistic mobile candidate if capacity
-turns out to help. Judge on **mAP per MB**, not mAP alone — the app already carries a
-29 MB classifier, and today's YOLO26n `.pte` is only 9.3 MB (38 MB total). A 26m
-detector would push the app past ~110 MB, which is a poor trade for a field app on
-mid-range Android where install size is a real data cost. `src/benchmark/quantize.py`
-(INT8) claws back roughly 4×, so *26s quantized* is the configuration to beat.
+1. **Collect more images.** This is now the highest-value work on the detector — more
+   so than any architecture change. ~124 images/class is the binding constraint.
+2. **Keep yolo26n for the mobile app.** Adding 39 MB for +0.02 mAP@0.5 is a poor trade
+   in a rural-deployment context where install size is a real data cost.
+3. **It is a citable negative result** — *"detector capacity is not the bottleneck at
+   this dataset scale"* — backed by a clean 3-point sweep under identical data,
+   schedule and augmentation.
 
-Switching model size is one line: `MODEL_SIZE` in [`src/yolo/config.py`](../src/yolo/config.py).
+> **Caveats for the write-up:** one run per variant, no seed repetitions, so the
+> deltas are indicative rather than significance-tested. Batch sizes differed for
+> memory reasons (32 / 48 / 32 for n / s / m), a mild confound since batch size
+> affects final accuracy.
 
-```bash
-# edit MODEL_SIZE to yolo26s.pt / yolo26m.pt between runs
-bash scripts/train_yolo.sh
-python -m src.benchmark.latency        # size + latency table for the comparison
-```
+### Still open — batch size on the next box
 
-### B. Raise the YOLO batch size — the GPU was 73 % idle
-
-During the trial run YOLO26n sat at **27 % GPU utilisation and 6.9 GB of 31.4 GB
-VRAM** at `--batch-size 32`. YOLO26n is a nano model; batch 32 does not come close to
-occupying a modern card. Whatever size you train next, push the batch up and watch
-`nvidia-smi` — this is close to free wall-clock.
-
-Note the A5000 has **24 GB**, not the 5090's 32 GB, so re-check headroom there rather
-than copying a number measured on the trial box.
-
+The 5090 sat at **17–27 % utilisation** across these runs (12.5 GB of 31.4 GB for
+yolo26s at batch 48). There is free wall-clock in a larger batch. **Re-measure on the
+A5000 — it has 24 GB, less than the box these numbers came from** — and note that
+changing batch between variants confounds a capacity comparison, so hold it constant
+if you repeat the sweep.
 ---
 
 ## Tier 1 — highest impact for the paper
