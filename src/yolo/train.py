@@ -243,7 +243,7 @@ def log_startup(device, batch, n_train, n_val, model_tag, epochs, dry_run, use_a
     print(f"\n{sep}")
     print(f"  Device       : {device}"
           + ("  (multi-GPU DDP)" if isinstance(device, list) else ""))
-    print(f"  Model        : {model_tag}.pt")
+    print(f"  Model        : {model_tag}")
     print(f"  Batch        : {batch}"
           + ("  (16/GPU)" if isinstance(device, list) else ""))
     print(f"  Image size   : {IMG_SIZE}×{IMG_SIZE}")
@@ -364,7 +364,8 @@ def generate_figures(save_dir=None) -> None:
     dfs    = {s: _load_split_df(s) for s in ["train", "valid", "test"]}
     df_all = pd.concat(dfs.values(), ignore_index=True)
     df_box = df_all[df_all.class_id >= 0].copy()
-    n_imgs = {s: len(list((DATA_DIR / s / "images").glob("*.*")))
+    # Count real images only: cache="disk" writes a .npy beside each one.
+    n_imgs = {s: len({f for f in (DATA_DIR / s / "images").iterdir() if f.suffix.lower() in {".jpg", ".jpeg", ".png", ".bmp", ".webp"}})
               for s in ["train", "valid", "test"]}
     for s, df in dfs.items():
         print(f"    {s:6s}: {n_imgs[s]:5d} imgs | "
@@ -858,8 +859,13 @@ Examples:
     if is_mps:
         _patch_tal_for_mps()
 
-    n_train = len(list((DATA_DIR / "train" / "images").glob("*.*")))
-    n_val   = len(list((DATA_DIR / "valid" / "images").glob("*.*")))
+    # Count real images only: cache="disk" writes a .npy beside each one, so a
+    # glob("*.*") double-counts and reported 82,376 for a 41,188-image split.
+    _IMG_EXT = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
+    n_train = len([f for f in (DATA_DIR / "train" / "images").iterdir()
+                   if f.suffix.lower() in _IMG_EXT])
+    n_val   = len([f for f in (DATA_DIR / "valid" / "images").iterdir()
+                   if f.suffix.lower() in _IMG_EXT])
 
     last_pt  = RUNS_DIR / EXP_NAME / "weights" / "last.pt"
     resumable = last_pt.exists() and _is_resumable(last_pt)
