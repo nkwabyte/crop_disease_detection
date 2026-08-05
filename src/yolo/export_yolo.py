@@ -69,8 +69,17 @@ def main():
     et_path = Path(str(et_result))
     pte_src = None
     if et_path.is_dir():
+        # Ultralytics writes <ckpt-stem>.pte into this directory, but a previous
+        # export's artifacts may still be sitting there under other names. Taking
+        # rglob()'s first hit silently shipped a stale .pte, so match the
+        # checkpoint by name and only fall back to the newest file.
         pte_files = list(et_path.rglob("*.pte"))
-        pte_src = pte_files[0] if pte_files else None
+        named = [p for p in pte_files if p.stem == BEST_PT.stem]
+        if named:
+            pte_src = named[0]
+        elif pte_files:
+            pte_src = max(pte_files, key=lambda p: p.stat().st_mtime)
+            print(f"[WARN] No {BEST_PT.stem}.pte in {et_path}; using newest: {pte_src.name}")
     else:
         pte_src = et_path if et_path.suffix == ".pte" else None
 
