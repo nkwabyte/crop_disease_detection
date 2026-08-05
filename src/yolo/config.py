@@ -5,12 +5,17 @@ from pathlib import Path
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-DATA_DIR     = PROJECT_ROOT / "data" / "yolo"
+# YOLO_DATA selects the dataset: the 5,239-image Roboflow export (default) or the
+# 58,361-image self-collected set converted by scripts/detector_to_yolo.py.
+DATA_DIR     = Path(os.environ.get("YOLO_DATA", PROJECT_ROOT / "data" / "yolo"))
 NEG_DIR      = PROJECT_ROOT / "data" / "negatives"
-FIXED_YAML   = PROJECT_ROOT / "data_fixed.yaml"
 RUNS_DIR     = PROJECT_ROOT / "runs"
 OUTPUT_DIR   = PROJECT_ROOT / "outputs" / "yolo_output"
 EXP_NAME     = os.environ.get("YOLO_EXP", "crop_disease_yolo26")
+# Per-experiment, so two runs on different datasets cannot overwrite each other's
+# generated yaml — they would otherwise both write data_fixed.yaml and the second
+# would silently retrain the first on the wrong data.
+FIXED_YAML   = PROJECT_ROOT / f"data_fixed_{EXP_NAME}.yaml"
 MODELS_DIR   = PROJECT_ROOT / "models"
 MODELS_DIR.mkdir(exist_ok=True)
 
