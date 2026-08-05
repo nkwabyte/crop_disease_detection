@@ -1,5 +1,6 @@
 """Configuration constants for Faster R-CNN models (baseline, ablation, and SE-FPN final model)."""
 
+import os
 from pathlib import Path
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
@@ -7,7 +8,11 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 DATASET_DIR  = PROJECT_ROOT / "data" / "detector"
 NEG_DIR      = PROJECT_ROOT / "data" / "negatives"
 
-OUTPUT_DIR_BASELINE = PROJECT_ROOT / "outputs" / "fasterrcnn_output"
+# FRCNN_OUT lets the divergence bisect write each arm to its own directory so no
+# arm overwrites another, or the real run.
+OUTPUT_DIR_BASELINE = Path(os.environ.get("FRCNN_OUT", PROJECT_ROOT / "outputs" / "fasterrcnn_output"))
+if not OUTPUT_DIR_BASELINE.is_absolute():
+    OUTPUT_DIR_BASELINE = PROJECT_ROOT / OUTPUT_DIR_BASELINE
 OUTPUT_DIR_ALT      = PROJECT_ROOT / "outputs" / "alt_fasterrcnn_output"
 OUTPUT_DIR_FINAL    = PROJECT_ROOT / "outputs" / "final_output"
 
@@ -29,11 +34,11 @@ PATIENCE_DEFAULT      = 8
 BATCH_SIZE            = 4    # default on MPS/CPU (M4 Pro 24 GB unified memory)
 CUDA_BATCH_SIZE       = 16   # default when a CUDA GPU is detected (e.g. 96 GB RTX PRO 6000)
 ACCUM_STEPS           = 2    # gradient accumulation steps for SE-FPN
-LR0                   = 5e-3
+LR0                   = float(os.environ.get("FRCNN_LR", 5e-3))
 WEIGHT_DECAY          = 5e-4
 MOMENTUM              = 0.9
 WARMUP_EPOCHS         = 3
-FREEZE_BACKBONE_EPOCHS= 5
+FREEZE_BACKBONE_EPOCHS= int(os.environ.get("FRCNN_FREEZE", 5))
 GRAD_CLIP             = 10.0
 EVAL_EVERY            = 5
 NUM_NEGATIVES         = 200

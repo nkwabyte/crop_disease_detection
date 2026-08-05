@@ -7,7 +7,11 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 # YOLO_DATA selects the dataset: the 5,239-image Roboflow export (default) or the
 # 58,361-image self-collected set converted by scripts/detector_to_yolo.py.
-DATA_DIR     = Path(os.environ.get("YOLO_DATA", PROJECT_ROOT / "data" / "yolo"))
+# Resolved against the project root: prepare_data_yaml writes DATA_DIR into both
+# the yaml's `path:` key and its train/val/test entries, so a relative value makes
+# Ultralytics join them and look for data/detector_yolo/data/detector_yolo/...
+_yolo_data   = Path(os.environ.get("YOLO_DATA", PROJECT_ROOT / "data" / "yolo"))
+DATA_DIR     = _yolo_data if _yolo_data.is_absolute() else (PROJECT_ROOT / _yolo_data)
 NEG_DIR      = PROJECT_ROOT / "data" / "negatives"
 RUNS_DIR     = PROJECT_ROOT / "runs"
 OUTPUT_DIR   = PROJECT_ROOT / "outputs" / "yolo_output"

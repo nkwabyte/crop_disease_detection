@@ -435,6 +435,21 @@ def train_one_epoch(
             loss_dict = model(images, targets)
             losses    = sum(loss_dict.values())
 
+        # A non-finite loss poisons every subsequent step: the weights go NaN and
+        # never recover, so the remaining epochs are guaranteed waste. Fail loudly
+        # and immediately instead — the last saved checkpoint predates the
+        # divergence and stays valid. Learned the expensive way: a Faster R-CNN run
+        # spent 24 of 30 epochs on NaN weights while the process looked healthy,
+        # because the training log was block-buffered.
+        if not torch.isfinite(losses):
+            parts = ", ".join(f"{k}={v.item():.4g}" for k, v in loss_dict.items())
+            raise RuntimeError(
+                f"non-finite loss at epoch {epoch}, batch {batch_idx}: total={losses.item()} "
+                f"({parts}). Training aborted before the weights were destroyed. "
+                f"Most likely the backbone unfreezing into peak LR — compare "
+                f"FREEZE_BACKBONE_EPOCHS with WARMUP_EPOCHS in the model's config.py."
+            )
+
         optimizer.zero_grad()
         if scaler is not None:
             scaler.scale(losses).backward()
@@ -1434,7 +1449,12 @@ Examples:
         torch.backends.cudnn.benchmark = True
 
     # AMP: CUDA only (fp16 autocast + loss scaling for 30-50% throughput gain)
-    scaler = torch.amp.GradScaler("cuda") if device.type == "cuda" else None
+    # FRCNN_NO_AMP=1 disables mixed precision — arm B of the divergence bisect.
+    _no_amp = os.environ.get("FRCNN_NO_AMP") == "1"
+    scaler = (torch.amp.GradScaler("cuda")
+              if device.type == "cuda" and not _no_amp else None)
+    if _no_amp:
+        print("  AMP disabled (FRCNN_NO_AMP=1)")
 
     # Build datasets
     train_df = _load_csv(TRAIN_CSV)
