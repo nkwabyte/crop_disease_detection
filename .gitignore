@@ -85,7 +85,18 @@ models/*
 # =============================================================================
 # Training Outputs, Runs & Logs
 # =============================================================================
-outputs/
+outputs/*
+# …except the cross-model comparison artifacts: they are paper figures and tables,
+# they are small (~128 KB), and docs/ links to them — an ignored path would render
+# as a broken image on GitHub. Git needs each parent un-ignored before a nested
+# negation can apply, hence the stepwise rules.
+!outputs/benchmarks/
+outputs/benchmarks/*
+!outputs/benchmarks/*.md
+!outputs/benchmarks/*.json
+!outputs/benchmarks/figures/
+outputs/benchmarks/figures/*
+!outputs/benchmarks/figures/*.png
 runs/
 logs/
 *.log

@@ -1,0 +1,94 @@
+{
+  "n_crop_test": 1016,
+  "n_ood_test": 475,
+  "base": {
+    "crop_accuracy_no_threshold": 0.9753937007874016,
+    "thresholds": {
+      "0.50": {
+        "crop_retention": 0.9744094488188977,
+        "ood_rejection": 0.2736842105263158,
+        "per_source": {
+          "eggplant": 0.0,
+          "millet": 0.05,
+          "ood": 0.3979591836734694,
+          "potato": 0.11627906976744186,
+          "sorghum": 0.0,
+          "tobacco": 0.08695652173913043
+        }
+      },
+      "0.55": {
+        "crop_retention": 0.9744094488188977,
+        "ood_rejection": 0.40842105263157896,
+        "per_source": {
+          "eggplant": 0.0851063829787234,
+          "millet": 0.1,
+          "ood": 0.5612244897959183,
+          "potato": 0.18604651162790697,
+          "sorghum": 0.2,
+          "tobacco": 0.2608695652173913
+        }
+      },
+      "0.70": {
+        "crop_retention": 0.9616141732283464,
+        "ood_rejection": 0.6547368421052632,
+        "per_source": {
+          "eggplant": 0.3404255319148936,
+          "millet": 0.4,
+          "ood": 0.7925170068027211,
+          "potato": 0.4418604651162791,
+          "sorghum": 0.6,
+          "tobacco": 0.5652173913043478
+        }
+      },
+      "0.80": {
+        "crop_retention": 0.9507874015748031,
+        "ood_rejection": 0.8,
+        "per_source": {
+          "eggplant": 0.48936170212765956,
+          "millet": 0.75,
+          "ood": 0.9115646258503401,
+          "potato": 0.6395348837209303,
+          "sorghum": 0.6,
+          "tobacco": 0.6956521739130435
+        }
+      },
+      "0.90": {
+        "crop_retention": 0.827755905511811,
+        "ood_rejection": 0.9473684210526315,
+        "per_source": {
+          "eggplant": 0.7446808510638298,
+          "millet": 0.95,
+          "ood": 0.9829931972789115,
+          "potato": 0.9418604651162791,
+          "sorghum": 0.8,
+          "tobacco": 0.9565217391304348
+        }
+      },
+      "0.95": {
+        "crop_retention": 0.1062992125984252,
+        "ood_rejection": 0.9957894736842106,
+        "per_source": {
+          "eggplant": 0.9574468085106383,
+          "millet": 1.0,
+          "ood": 1.0,
+          "potato": 1.0,
+          "sorghum": 1.0,
+          "tobacco": 1.0
+        }
+      }
+    }
+  },
+  "ood": {
+    "crop_accuracy": 0.9753937007874016,
+    "crops_misrouted_to_other": 0.003937007874015748,
+    "ood_rejection": 0.9873684210526316,
+    "per_source": {
+      "eggplant": 0.9361702127659575,
+      "millet": 1.0,
+      "ood": 0.9965986394557823,
+      "potato": 0.9767441860465116,
+      "sorghum": 1.0,
+      "tobacco": 1.0
+    }
+  }
+}

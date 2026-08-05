@@ -1,0 +1,41 @@
+[
+  {
+    "model": "yolo26n",
+    "version": 1,
+    "snapshot": "yolo26n_v1_20260804_map0.2904",
+    "params_m": 2.51,
+    "size_mb": 5.4,
+    "map50": 0.29039,
+    "map50_95": 0.11621,
+    "best_epoch": 150,
+    "epochs": 179,
+    "vs_baseline_pct": 0.0,
+    "map50_per_mb": 0.0538
+  },
+  {
+    "model": "yolo26s",
+    "version": 1,
+    "snapshot": "yolo26s_v1_20260804_map0.3054",
+    "params_m": 9.97,
+    "size_mb": 20.4,
+    "map50": 0.30542,
+    "map50_95": 0.12083,
+    "best_epoch": 116,
+    "epochs": 120,
+    "vs_baseline_pct": 5.18,
+    "map50_per_mb": 0.015
+  },
+  {
+    "model": "yolo26m",
+    "version": 1,
+    "snapshot": "yolo26m_v1_20260804_map0.3100",
+    "params_m": 21.81,
+    "size_mb": 44.1,
+    "map50": 0.31004,
+    "map50_95": 0.12185,
+    "best_epoch": 83,
+    "epochs": 88,
+    "vs_baseline_pct": 6.77,
+    "map50_per_mb": 0.007
+  }
+]
