@@ -106,3 +106,6 @@ data_rtdetr.yaml
 
 # Versioned weight snapshots (scripts/archive_weights.py) — large binaries
 weights/
+
+# Derived YOLO-format view of data/detector (symlinks + generated labels)
+data/detector_yolo/
