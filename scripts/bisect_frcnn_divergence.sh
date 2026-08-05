@@ -30,6 +30,10 @@ PY="${PY:-./.venv/bin/python}"
 [ -x "$PY" ] || PY="python3"
 mkdir -p logs
 EPOCHS="${EPOCHS:-7}"
+# Subsample by default: the divergence triggers at the unfreeze boundary, not from
+# data volume, and full-data arms cost ~15 min/epoch. Arm R below proves the subset
+# still reproduces the failure before any conclusion is drawn from the other arms.
+export FRCNN_SUBSET_PCT="${FRCNN_SUBSET_PCT:-10}"
 
 WANT="$*"
 want() { [ -z "$WANT" ] && return 0; for a in $WANT; do [ "$a" = "$1" ] && return 0; done; return 1; }
@@ -61,6 +65,20 @@ echo "  Faster R-CNN divergence bisect — ${EPOCHS} epochs per arm"
 "$PY" -c "import torch;print('  GPU:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')" 2>/dev/null
 echo "════════════════════════════════════════════════════════════════"
 
+run_arm R "REPRODUCTION CHECK — stock config, must still diverge" \
+  env FRCNN_OUT=outputs/bisect_r_output \
+  "$PY" -m src.fasterrcnn.train_alt_faster_rcnn --mode baseline \
+        --batch-size 8 --epochs "$EPOCHS" --skip-negatives --no-figures
+
+# If R survived, the subset is not a valid proxy and the arms below prove nothing.
+if [ -f logs/bisect_R.log ] && ! grep -qa "non-finite loss" logs/bisect_R.log; then
+  echo
+  echo "  !! ARM R did NOT diverge — the ${FRCNN_SUBSET_PCT}% subset does not reproduce the"
+  echo "     failure, so arms A/B/C on it would be meaningless. Re-run with"
+  echo "     FRCNN_SUBSET_PCT=100 (slower) before drawing any conclusion."
+  exit 2
+fi
+
 run_arm A "unfreeze during warmup (FRCNN_FREEZE=2)" \
   env FRCNN_FREEZE=2 FRCNN_OUT=outputs/bisect_a_output \
   "$PY" -m src.fasterrcnn.train_alt_faster_rcnn --mode baseline \
@@ -79,7 +97,7 @@ run_arm C "lower peak LR (FRCNN_LR=1e-3)" \
 echo
 echo "════════════════════════════════════════════════════════════════"
 echo "  Summary"
-for a in A B C; do
+for a in R A B C; do
   [ -f "logs/bisect_${a}.log" ] || continue
   if grep -qa "non-finite loss" "logs/bisect_${a}.log"; then
     echo "    ARM ${a}: diverged"

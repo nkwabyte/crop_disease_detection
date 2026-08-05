@@ -150,11 +150,23 @@ CLASS_NAMES_DISPLAY = CLASS_NAMES[1:]
 # ============================================================================
 
 def _load_csv(csv_path: Path) -> pd.DataFrame:
-    """Load an annotation CSV and compute the img_id column."""
+    """Load an annotation CSV and compute the img_id column.
+
+    FRCNN_SUBSET_PCT subsamples for the divergence bisect: reproducing a NaN that
+    triggers at the unfreeze boundary does not need 41k images, and a full-data arm
+    costs ~15 min/epoch. Sampling is by image id rather than by row, so an image
+    keeps all of its boxes, and it is seeded so every arm sees the same subset.
+    Unset (the default) means the full dataset.
+    """
     df = pd.read_csv(csv_path)
     # Validate and filter degenerate boxes
     df = df[(df["x1"] < df["x2"]) & (df["y1"] < df["y2"])].copy()
     df["img_id"] = df["fname"].apply(lambda x: x.rsplit(".", 1)[0])
+    pct = float(os.environ.get("FRCNN_SUBSET_PCT", "100"))
+    if 0 < pct < 100:
+        keep = pd.Series(df["img_id"].unique()).sample(frac=pct / 100.0,
+                                                       random_state=42)
+        df = df[df["img_id"].isin(set(keep))].copy()
     return df
 
 class CropDiseaseDataset(Dataset):
