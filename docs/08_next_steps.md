@@ -70,6 +70,64 @@ changing batch between variants confounds a capacity comparison, so hold it cons
 if you repeat the sweep.
 ---
 
+## Where the accuracy actually is — measured 2026-08-05
+
+All four detectors below trained on the same 5,239-image YOLO-format split, so
+these are directly comparable. Full table and charts:
+[`outputs/benchmarks/comparison_table.md`](../outputs/benchmarks/comparison_table.md).
+
+| Model | Params | mAP@0.5 | mAP@0.5:0.95 |
+| ----- | ------ | ------- | ------------ |
+| yolo26n | 2.51M | 0.2904 | 0.1162 |
+| yolo26s | 9.97M | 0.3054 | 0.1208 |
+| yolo26m | 21.81M | 0.3100 | 0.1218 |
+| **rtdetr-l** | ~32M | **0.3446** | **0.1438** |
+
+Two diagnostics on the training data explain the absolute level, and point at what
+to fix. Both are measured, not assumed:
+
+**Objects are tiny.** The median box is **0.27 % of image area** — about 33x33 px at
+640 — and **48.2 % of all boxes are COCO-"small"** (under 32x32 equivalent). Detection
+accuracy is famously resolution-sensitive in exactly this regime.
+
+**Classes are severely imbalanced — 190x** between the most and least common.
+Pepper_Early_Blight has **22 boxes** in the whole training split; Tomato_Septoria has
+4,198. Three of 23 classes have under 100. Because mAP averages over classes, a
+handful of starved classes drags the headline number down disproportionately.
+
+### Ranked by expected return
+
+1. **Train at higher resolution — cheapest large win.** With half the boxes under
+   32x32 px, going from `imgsz=640` to 1024 or 1280 gives each lesion several times
+   more feature-map cells. Note the source images are **not** square (640x480,
+   640x288, 640x426 …): the long side is already capped at 640, so they have been
+   downscaled. **Re-exporting from Roboflow at a higher resolution would be a real
+   information gain, not just upsampling** — worth checking what the originals are.
+
+2. **Collect for the rare classes specifically, not uniformly.** Adding images of
+   Pepper_Early_Blight (22 boxes) is worth far more per image than more
+   Tomato_Septoria (4,198). This sharpens the earlier "collect more data" conclusion
+   into something targetable. Class-balanced sampling or focal loss is the
+   no-new-data version of the same idea.
+
+3. **Prefer architecture over capacity.** RT-DETR-L beats yolo26m by **+11.2 %** for
+   roughly 1.5x the parameters, whereas scaling YOLO itself bought only +6.8 % for
+   8.7x. The query-based head suits this data; DINO / Deformable-DETR are the natural
+   next candidates. (Note RT-DETR's `.pte` is 123 MB — a research win, not yet a
+   mobile one.)
+
+4. **Exploit the two-stage pipeline in evaluation.** The Stage-1 classifier is 97.5 %
+   accurate, and narrowing to a crop reduces the detector's problem from 23 classes
+   to 5 / 10 / 8. Detector-alone mAP therefore understates end-to-end performance —
+   worth measuring the pipeline as deployed rather than only its parts.
+
+5. **Question the hue augmentation.** Disease is signalled largely by colour, yet the
+   pipeline applies `ColorJitter(hue=0.05)`. It is also the single most expensive CPU
+   op in the loader (13.6 ms/image of a 24 ms budget). An ablation with hue disabled
+   is cheap and could plausibly help accuracy *and* throughput.
+
+---
+
 ## Tier 1 — highest impact for the paper
 
 ### 1. RT-DETR / DETR-style query head (transformer *detection paradigm*) — [OK] DONE (`src/rtdetr/`)

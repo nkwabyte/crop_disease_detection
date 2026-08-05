@@ -80,37 +80,90 @@ def _collect_benchmark_jsons() -> list[dict]:
     return records
 
 
-def _collect_yolo() -> Optional[dict]:
-    """Pull best mAP@0.5 from an Ultralytics results.csv (if a YOLO run exists)."""
-    candidates = list((PROJECT_ROOT / "runs").glob("*/results.csv")) if (PROJECT_ROOT / "runs").exists() else []
-    candidates += list((OUTPUTS / "yolo_output").glob("**/results.csv")) if (OUTPUTS / "yolo_output").exists() else []
-    best = None
-    used = None
-    for csv_path in candidates:
+def _run_label(run_dir: Path) -> tuple[str, str]:
+    """Map an Ultralytics run directory to (model_name, architecture)."""
+    n = run_dir.name
+    table = {
+        "crop_disease_yolo26":  ("yolo26n",  "YOLO26n (Ultralytics)"),
+        "crop_disease_yolo26s": ("yolo26s",  "YOLO26s (Ultralytics)"),
+        "crop_disease_yolo26m": ("yolo26m",  "YOLO26m (Ultralytics)"),
+        "crop_disease_rtdetr":  ("rtdetr-l", "RT-DETR-L (query head, no NMS)"),
+    }
+    if n in table:
+        return table[n]
+    return (n.replace("crop_disease_", ""), n.replace("crop_disease_", ""))
+
+
+def _archived_params(model_name: str) -> Optional[float]:
+    """Parameter count from a weights/ snapshot, if one was archived."""
+    arch = PROJECT_ROOT / "weights"
+    if not arch.exists():
+        return None
+    for d in sorted(arch.iterdir(), reverse=True):
+        mf = d / "MANIFEST.json"
+        if d.is_dir() and mf.exists():
+            try:
+                m = json.loads(mf.read_text())
+            except Exception:
+                continue
+            if m.get("model") == model_name and (d / "best.pt").exists():
+                try:
+                    import torch
+                    ck = torch.load(d / "best.pt", map_location="cpu", weights_only=False)
+                    mdl = ck.get("model")
+                    if mdl is not None:
+                        return sum(pp.numel() for pp in mdl.parameters())
+                except Exception:
+                    return None
+    return None
+
+
+def _collect_ultralytics() -> list:
+    """One entry per Ultralytics run — YOLO variants and RT-DETR alike.
+
+    The previous version scanned every run, kept only the single highest mAP and
+    hardcoded the label "yolo26n". With a capacity sweep present that reported the
+    LARGEST model's score under the SMALLEST model's name — a wrong number under a
+    wrong label, which is exactly the kind of thing that reaches a paper unnoticed.
+    """
+    roots = []
+    if (PROJECT_ROOT / "runs").exists():
+        roots += list((PROJECT_ROOT / "runs").glob("*/results.csv"))
+    for sub in ("yolo_output", "rtdetr_output"):
+        d = OUTPUTS / sub
+        if d.exists():
+            roots += list(d.glob("**/results.csv"))
+
+    out = []
+    for csv_path in sorted(roots):
         try:
             with open(csv_path) as f:
                 rows = list(csv.DictReader(f))
-            col = next((c for c in (rows[0].keys() if rows else [])
-                        if "mAP50" in c and "50-95" not in c), None)
+            if not rows:
+                continue
+            col = next((c for c in rows[0] if "mAP50" in c and "50-95" not in c), None)
+            col95 = next((c for c in rows[0] if "mAP50-95" in c), None)
             if not col:
                 continue
-            vals = [float(r[col]) for r in rows if r.get(col) not in (None, "", "nan")]
-            if vals:
-                m = max(vals)
-                if best is None or m > best:
-                    best, used = m, csv_path
+            best_row = max(rows, key=lambda r: float(r.get(col) or 0))
+            best = float(best_row[col])
+            if best <= 0:
+                continue
         except Exception:
             continue
-    if best is None:
-        return None
-    return {
-        "model_name": "yolo26n",
-        "architecture": "YOLO26n (Ultralytics)",
-        "map50": round(best, 5),
-        "num_params": None,
-        "per_class_ap": {},
-        "source": str(used.relative_to(PROJECT_ROOT)),
-    }
+        name, arch = _run_label(csv_path.parent)
+        out.append({
+            "model_name": name,
+            "architecture": arch,
+            "map50": round(best, 5),
+            "map50_95": round(float(best_row[col95]), 5) if col95 else None,
+            "epochs": len(rows),
+            "best_epoch": int(float(best_row.get("epoch", 0))),
+            "num_params": _archived_params(name),
+            "per_class_ap": {},
+            "source": str(csv_path.relative_to(PROJECT_ROOT)),
+        })
+    return out
 
 
 def _collect_alt_selected() -> Optional[dict]:
@@ -194,9 +247,10 @@ def _dedupe(records: list[dict]) -> list[dict]:
 
 def build_comparison() -> dict:
     detectors = _collect_benchmark_jsons()
-    for extra in (_collect_yolo(), _collect_alt_selected()):
-        if extra:
-            detectors.append(extra)
+    detectors += _collect_ultralytics()
+    extra = _collect_alt_selected()
+    if extra:
+        detectors.append(extra)
     detectors = _dedupe(detectors)
     detectors.sort(key=lambda r: (r["map50"] is None, -(r["map50"] or 0)))
     classifier = _collect_classifier()

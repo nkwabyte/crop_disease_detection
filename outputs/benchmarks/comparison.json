@@ -1,0 +1,55 @@
+{
+  "detectors": [
+    {
+      "model_name": "rtdetr-l",
+      "architecture": "RT-DETR-L (query head, no NMS)",
+      "map50": 0.34464,
+      "map50_95": 0.14376,
+      "epochs": 70,
+      "best_epoch": 52,
+      "num_params": null,
+      "per_class_ap": {},
+      "source": "outputs/rtdetr_output/crop_disease_rtdetr/results.csv"
+    },
+    {
+      "model_name": "yolo26m",
+      "architecture": "YOLO26m (Ultralytics)",
+      "map50": 0.31004,
+      "map50_95": 0.12185,
+      "epochs": 88,
+      "best_epoch": 83,
+      "num_params": 21808354,
+      "per_class_ap": {},
+      "source": "runs/crop_disease_yolo26m/results.csv"
+    },
+    {
+      "model_name": "yolo26s",
+      "architecture": "YOLO26s (Ultralytics)",
+      "map50": 0.30542,
+      "map50_95": 0.12083,
+      "epochs": 120,
+      "best_epoch": 116,
+      "num_params": 9965666,
+      "per_class_ap": {},
+      "source": "runs/crop_disease_yolo26s/results.csv"
+    },
+    {
+      "model_name": "yolo26n",
+      "architecture": "YOLO26n (Ultralytics)",
+      "map50": 0.29039,
+      "map50_95": 0.11621,
+      "epochs": 179,
+      "best_epoch": 150,
+      "num_params": 2512770,
+      "per_class_ap": {},
+      "source": "runs/crop_disease_yolo26/results.csv"
+    }
+  ],
+  "classifier": {
+    "model_name": "efficientnet_b2_classifier",
+    "architecture": "EfficientNet-B2 (Stage-1 crop classifier)",
+    "best_val_acc": 0.98047,
+    "best_val_f1": null,
+    "source": "classifier_output/metrics_history.json"
+  }
+}
