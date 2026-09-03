@@ -1,23 +1,40 @@
-# Crop Disease Detection — Two-Stage Pipeline
+# Crop Disease Detection ML Pipeline & Research Engine
 
-Object detection system for diagnosing diseases in corn, pepper, and tomato crops.
-23 disease/health classes across 3 crop types, trained on the Ghana Crop Disease Challenge dataset.
+[![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat&logo=python&logoColor=white)](#)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.x-EE4C2C?style=flat&logo=pytorch&logoColor=white)](#)
+[![Edge ML](https://img.shields.io/badge/Edge_ML-Meta_ExecuTorch_1.2-0288D1?style=flat)](#)
+[![YOLO](https://img.shields.io/badge/YOLO-Ultralytics_YOLO26-10B981?style=flat)](#)
+[![Transformers](https://img.shields.io/badge/Transformers-RT--DETR--L_%7C_ViTDet-8B5CF6?style=flat)](#)
+[![Dataset](https://img.shields.io/badge/Dataset-Ghana_Crop_v2-F59E0B?style=flat)](#)
+[![License](https://img.shields.io/badge/License-CC_BY_4.0-718096?style=flat)](#)
 
-The system uses a **two-stage pipeline**: a crop-type classifier first identifies the leaf species, then a disease detector runs on images confirmed to be from a known crop. This prevents cross-crop false positives (e.g., mango leaves being labelled as Tomato diseases).
+Production-grade, two-stage deep learning pipeline for fine-grained crop disease diagnosis, out-of-distribution leaf gating, and mobile edge compilation.
 
-Eight training scripts are provided:
+---
 
-| Script | Purpose | Architecture | Output |
-| ------ | ------- | ------------ | ------ |
+## 📖 System Overview
+
+The **Crop Disease Detection Pipeline** is an end-to-end computer vision and deep learning research platform developed for diagnosing diseases in West African staple crops—**Corn** (*Zea mays*), **Pepper** (*Capsicum* spp.), and **Tomato** (*Solanum lycopersicum*). Trained on the **Ghana Crop Disease Challenge v2** dataset, it handles 23 disease and health classes across more than 35,000 lesion annotations.
+
+To eliminate cross-crop false positives (e.g. non-crop vegetation such as mango or cassava leaves being erroneously diagnosed with Tomato Late Blight), the system implements a **Two-Stage Gating Pipeline**:
+1. **Stage 1 (Crop Classifier & OOD Guard):** An EfficientNet-B2 network verifies leaf identity and rejects out-of-distribution flora with **98.74% accuracy**.
+2. **Stage 2 (Disease Detector):** High-capacity detection architectures (YOLO26, RT-DETR-L, SE-FPN Faster R-CNN) localize and classify lesions on confirmed crop leaves.
+
+### Model Training & Research Suite
+
+Eight training scripts and architectures are provided:
+
+| Script | Purpose | Architecture | Output Artifact |
+| :--- | :--- | :--- | :--- |
 | `src/classifier/generate_classifier_csv.py` | Build classifier CSVs | — | `data/yolo/classifier_*.csv` |
-| `src/classifier/train_classifier.py` | **Stage 1 — Crop classifier** | EfficientNet-B2 | `outputs/classifier_output/` |
-| `src/yolo/train.py` | Stage 2 — YOLO26 detector | YOLO26n (ultralytics) | `outputs/yolo_output/` |
+| `src/classifier/train_classifier.py` | **Stage 1 — Crop classifier & OOD Guard** | EfficientNet-B2 | `outputs/classifier_output/` |
+| `src/yolo/train.py` | **Stage 2 — YOLO26 detector** | YOLO26n (Ultralytics) | `outputs/yolo_output/` |
 | `src/fasterrcnn/train_alt_faster_rcnn.py --mode baseline` | Stage 2 — Faster RCNN baseline | ResNet-50-FPN-v2 | `outputs/fasterrcnn_output/` |
-| `src/fasterrcnn/train_alt_faster_rcnn.py --mode ablation` | Ablation study | 7 Faster RCNN variants | `outputs/alt_fasterrcnn_output/` |
-| `src/fasterrcnn/faster_rcnn_final.py` | Stage 2 — **SE-FPN final model** | ResNet-50-FPN-v2 + SE attention | `outputs/final_output/` |
-| `src/vit/train_vit.py` | Stage 2 — **ViTDet detector** | ViT-B/16 backbone + Faster RCNN head | `outputs/vit_output/` |
-| `src/swin/train_swin.py` | Stage 2 — **Swin detector** | Swin-V2-T + FPN + Faster RCNN head | `outputs/swin_output/` |
-| `src/rtdetr/train_rtdetr.py` | Stage 2 — **RT-DETR detector** | RT-DETR-L (transformer query head) | `outputs/rtdetr_output/` |
+| `src/fasterrcnn/train_alt_faster_rcnn.py --mode ablation` | Ablation study (7 configurations) | ResNet-50 Variants | `outputs/alt_fasterrcnn_output/` |
+| `src/fasterrcnn/faster_rcnn_final.py` | **Stage 2 — SE-FPN final model** | ResNet-50-FPN-v2 + SE Attention | `outputs/final_output/` |
+| `src/vit/train_vit.py` | Stage 2 — ViTDet detector | ViT-B/16 + Faster RCNN Head | `outputs/vit_output/` |
+| `src/swin/train_swin.py` | Stage 2 — Swin detector | Swin-V2-T + FPN + Faster RCNN Head | `outputs/swin_output/` |
+| `src/rtdetr/train_rtdetr.py` | **Stage 2 — RT-DETR detector** | RT-DETR-L (Transformer Query Head) | `outputs/rtdetr_output/` |
 
 ## Environment
 
